@@ -1,7 +1,7 @@
 # Caddy terminates TLS and obtains/renews certificates automatically from
-# Let's Encrypt (ZeroSSL as fallback). Certificates live in the caddy_data
-# volume; keep it, or every redeploy re-requests certificates and you will hit
-# Let's Encrypt rate limits.
+# Let's Encrypt only. Certificates live in the caddy_data volume; keep it, or
+# every redeploy re-requests certificates and you will hit Let's Encrypt rate
+# limits.
 #
 # Requirements: DNS A/AAAA records for every name in SITE_ADDRESSES point at this
 # server, and ports 80 and 443 are reachable from the internet.
@@ -9,9 +9,12 @@
 {
 	email {$ACME_EMAIL}
 
-	# Uncomment while testing to use the Let's Encrypt staging CA (no rate
-	# limits, untrusted certificates). Delete the caddy_data volume afterwards.
-	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+	# Setting acme_ca replaces Caddy's default issuers (Let's Encrypt with a
+	# ZeroSSL fallback) with this single CA. For testing, set ACME_CA in .env to
+	# the staging CA (no rate limits, untrusted certificates), and delete the
+	# caddy_data volume when switching back:
+	#   https://acme-staging-v02.api.letsencrypt.org/directory
+	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
 
 # Comma-separated list, e.g. "academy.example.com, www.academy.example.com"

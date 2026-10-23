@@ -69,6 +69,7 @@ services:
       - "443:443/udp" # HTTP/3
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
       SITE_ADDRESSES: ${SITE_ADDRESSES:-${LEARNHOUSE_DOMAIN}}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
