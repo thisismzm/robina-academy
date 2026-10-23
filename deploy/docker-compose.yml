@@ -1,15 +1,20 @@
 # Production stack for the customized LearnHouse build in this repository.
 #
 #   caddy        public entrypoint, automatic HTTPS (Let's Encrypt), HTTP/3
-#   learnhouse-app   image built from ../Dockerfile (web + api + collab + nginx)
+#   learnhouse-app   image published by .github/workflows/build-production.yaml
+#                    (web + api + collab + nginx)
 #   migrate      one-shot Alembic job, must succeed before the app starts
 #   db           PostgreSQL 16 + pgvector
 #   redis        Redis with AOF persistence
 #   backup       scheduled pg_dump into ./backups
 #
 # Usage (from this directory):
-#   cp .env.example .env && $EDITOR .env
-#   docker compose up -d --build
+#   cp .env.example .env && $EDITOR .env    # set APP_IMAGE and APP_TAG
+#   docker compose pull
+#   docker compose up -d
+#
+# To build on the server instead of pulling, add the build override:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 #
 # Only Caddy publishes ports. db and redis sit on an internal network with no
 # route to the outside world.
@@ -77,14 +82,7 @@ services:
     logging: *logging
 
   learnhouse-app:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      args:
-        LEARNHOUSE_PUBLIC: ${LEARNHOUSE_PUBLIC:-true}
-    image: ${APP_IMAGE:-robina-academy}:${APP_TAG:-latest}
-    # Locally built only; never look for this image on a registry.
-    pull_policy: build
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}:${APP_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env
@@ -112,9 +110,8 @@ services:
     logging: *logging
 
   migrate:
-    # Reuses the image built by learnhouse-app; never pulled.
-    image: ${APP_IMAGE:-robina-academy}:${APP_TAG:-latest}
-    pull_policy: never
+    # Same image as the app, so migrations always match the code being deployed.
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}:${APP_TAG:-latest}
     restart: "no"
     env_file:
       - .env

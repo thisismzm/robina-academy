@@ -1,0 +1,18 @@
+# Optional override: build the app image on this host from the repository
+# instead of pulling it from the GitHub Container Registry.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+
+services:
+  learnhouse-app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        LEARNHOUSE_PUBLIC: ${LEARNHOUSE_PUBLIC:-true}
+    # Never look for the locally built image on a registry.
+    pull_policy: build
+
+  migrate:
+    # Reuses the image built for learnhouse-app.
+    pull_policy: never
