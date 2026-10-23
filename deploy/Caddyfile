@@ -1,0 +1,42 @@
+# Caddy terminates TLS and obtains/renews certificates automatically from
+# Let's Encrypt (ZeroSSL as fallback). Certificates live in the caddy_data
+# volume; keep it, or every redeploy re-requests certificates and you will hit
+# Let's Encrypt rate limits.
+#
+# Requirements: DNS A/AAAA records for every name in SITE_ADDRESSES point at this
+# server, and ports 80 and 443 are reachable from the internet.
+
+{
+	email {$ACME_EMAIL}
+
+	# Uncomment while testing to use the Let's Encrypt staging CA (no rate
+	# limits, untrusted certificates). Delete the caddy_data volume afterwards.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Comma-separated list, e.g. "academy.example.com, www.academy.example.com"
+{$SITE_ADDRESSES} {
+	encode zstd gzip
+
+	# Matches client_max_body_size in docker/nginx.conf (SCORM uploads).
+	request_body {
+		max_size 6GB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Caddy sets X-Forwarded-Proto/Host, which the app's internal nginx
+	# passes through so auth cookies are marked Secure. WebSocket upgrades for
+	# /collab are proxied automatically.
+	reverse_proxy learnhouse-app:80
+
+	log {
+		output stdout
+		format json
+	}
+}

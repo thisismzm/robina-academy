@@ -1,0 +1,193 @@
+# Production stack for the customized LearnHouse build in this repository.
+#
+#   caddy        public entrypoint, automatic HTTPS (Let's Encrypt), HTTP/3
+#   learnhouse-app   image built from ../Dockerfile (web + api + collab + nginx)
+#   migrate      one-shot Alembic job, must succeed before the app starts
+#   db           PostgreSQL 16 + pgvector
+#   redis        Redis with AOF persistence
+#   backup       scheduled pg_dump into ./backups
+#
+# Usage (from this directory):
+#   cp .env.example .env && $EDITOR .env
+#   docker compose up -d --build
+#
+# Only Caddy publishes ports. db and redis sit on an internal network with no
+# route to the outside world.
+
+name: robina-academy
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+# Values derived from LEARNHOUSE_DOMAIN so the public URLs cannot drift apart.
+# Shared by the app and the migration job (both load the API config).
+x-app-env: &app-env
+  HOSTNAME: 0.0.0.0
+  LEARNHOUSE_ENV: prod
+  LEARNHOUSE_DEVELOPMENT_MODE: "False"
+  LEARNHOUSE_SSL: "True"
+  LEARNHOUSE_TENANCY: ${LEARNHOUSE_TENANCY:-single}
+  LEARNHOUSE_DOMAIN: ${LEARNHOUSE_DOMAIN:?set LEARNHOUSE_DOMAIN in .env}
+  LEARNHOUSE_FRONTEND_DOMAIN: ${LEARNHOUSE_DOMAIN}
+  LEARNHOUSE_ALLOWED_ORIGINS: ${LEARNHOUSE_ALLOWED_ORIGINS:-https://${LEARNHOUSE_DOMAIN}}
+  LEARNHOUSE_PORT: "9000"
+  # SSR requests go straight to the API inside the container instead of
+  # hairpinning out through the public domain.
+  LEARNHOUSE_API_URL: http://localhost:9000
+  LEARNHOUSE_SQL_CONNECTION_STRING: postgresql://${POSTGRES_USER:-learnhouse}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-learnhouse}
+  LEARNHOUSE_REDIS_CONNECTION_STRING: redis://redis:6379/0
+  LEARNHOUSE_REDIS_URL: redis://redis:6379
+  LEARNHOUSE_AUTH_JWT_SECRET_KEY: ${LEARNHOUSE_AUTH_JWT_SECRET_KEY:?set LEARNHOUSE_AUTH_JWT_SECRET_KEY in .env}
+  NEXTAUTH_URL: https://${LEARNHOUSE_DOMAIN}
+  NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env}
+  COLLAB_INTERNAL_KEY: ${COLLAB_INTERNAL_KEY:?set COLLAB_INTERNAL_KEY in .env}
+  # Read by the web container at start (server-wrapper.js), not at build time.
+  NEXT_PUBLIC_LEARNHOUSE_API_URL: https://${LEARNHOUSE_DOMAIN}/api/v1/
+  NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL: https://${LEARNHOUSE_DOMAIN}/
+  NEXT_PUBLIC_LEARNHOUSE_DOMAIN: ${LEARNHOUSE_DOMAIN}
+  NEXT_PUBLIC_LEARNHOUSE_TOP_DOMAIN: ${LEARNHOUSE_TOP_DOMAIN:-${LEARNHOUSE_DOMAIN}}
+  NEXT_PUBLIC_LEARNHOUSE_HTTPS: "True"
+  NEXT_PUBLIC_LEARNHOUSE_MULTI_ORG: "False"
+  NEXT_PUBLIC_LEARNHOUSE_DEFAULT_ORG: ${LEARNHOUSE_INITIAL_ORG_SLUG:-default}
+  NEXT_PUBLIC_COLLAB_URL: wss://${LEARNHOUSE_DOMAIN}/collab
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+      SITE_ADDRESSES: ${SITE_ADDRESSES:-${LEARNHOUSE_DOMAIN}}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificates and ACME account: do not delete
+      - caddy_config:/config
+    depends_on:
+      learnhouse-app:
+        condition: service_healthy
+    networks:
+      - edge
+    logging: *logging
+
+  learnhouse-app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        LEARNHOUSE_PUBLIC: ${LEARNHOUSE_PUBLIC:-true}
+    image: ${APP_IMAGE:-robina-academy}:${APP_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *app-env
+    volumes:
+      # Uploaded course content (filesystem delivery). Not needed with S3.
+      - content:/app/api/content
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - edge     # reachable by Caddy, outbound internet (email, AI, payments)
+      - internal # db and redis
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    stop_grace_period: 30s
+    logging: *logging
+
+  migrate:
+    image: ${APP_IMAGE:-robina-academy}:${APP_TAG:-latest}
+    restart: "no"
+    env_file:
+      - .env
+    environment: *app-env
+    entrypoint: ["sh", "/migrate.sh"]
+    volumes:
+      - ./scripts/migrate.sh:/migrate.sh:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *logging
+
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-learnhouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-learnhouse}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    shm_size: 256mb
+    stop_grace_period: 60s
+    logging: *logging
+
+  redis:
+    image: redis:8.6.1-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  backup:
+    image: pgvector/pgvector:pg16 # same pg_dump major version as the server
+    restart: unless-stopped
+    entrypoint: ["sh", "/backup.sh"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-learnhouse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-learnhouse}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./scripts/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    logging: *logging
+
+networks:
+  edge:
+  internal:
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:
+  db_data:
+  redis_data:
+  content:

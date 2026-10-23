@@ -74,3 +74,6 @@ apps/web/ee
 .demo-secrets
 
 graphify-out
+
+# Production database dumps (deploy/scripts/backup.sh)
+deploy/backups/

@@ -131,6 +131,9 @@ coverage.xml
 *.db
 *.sqlite3
 
+# Production database dumps
+deploy/backups
+
 # Media files (can be large)
 uploads/
 media/
