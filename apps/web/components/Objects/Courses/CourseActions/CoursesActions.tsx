@@ -7,6 +7,7 @@ import { getUriWithOrg } from '@services/config/config'
 import { getOffersByResource } from '@services/payments/offers'
 import { startZarinPalCheckout } from '@services/payments/providers/zarinpal'
 import { startIranKishCheckout } from '@services/payments/providers/irankish'
+import { getActiveGateways } from '@services/payments/gateways'
 import { UserPen, ClockIcon, ArrowRight, BookOpen, UserPlus, Banknote } from 'lucide-react'
 import { OfferCard } from './OfferCard'
 import { applyForContributor } from '@services/courses/courses'
@@ -21,15 +22,21 @@ import { useTranslation } from 'react-i18next'
 import { formatCurrency } from '@/lib/format'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 
-// Keys the backend stores a course's per-gateway IRR price under in extra_metadata.
-const ZARINPAL_PRICE_KEY = 'zarinpal_price_irr'
-const IRANKISH_PRICE_KEY = 'irankish_price_irr'
+// A course sells for a single shared IRR price regardless of gateway. The
+// backend stores it under one key; the legacy per-gateway keys are read as a
+// fallback so courses priced before this change still show a price.
+const SHARED_PRICE_KEY = 'course_price_irr'
+const LEGACY_PRICE_KEYS = ['zarinpal_price_irr', 'irankish_price_irr']
 
-// Read a positive integer IRR price for a gateway off the course, or null.
-function readPrice(course: any, key: string): number | null {
-  const raw = course?.extra_metadata?.[key]
-  const n = Number(raw)
-  return raw != null && Number.isFinite(n) && n > 0 ? n : null
+// Read the course's shared positive-integer IRR price, or null if not for sale.
+function readCoursePrice(course: any): number | null {
+  const meta = course?.extra_metadata
+  for (const key of [SHARED_PRICE_KEY, ...LEGACY_PRICE_KEYS]) {
+    const raw = meta?.[key]
+    const n = Number(raw)
+    if (raw != null && Number.isFinite(n) && n > 0) return n
+  }
+  return null
 }
 
 // POST a set of form fields to a URL by building and auto-submitting a form.
@@ -101,9 +108,21 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
   const { track } = useLHAnalytics('learner')
   const searchParams = useSearchParams()
 
-  // The course's per-gateway prices (in Iranian Rial), if the admin set them.
-  const zarinpalPriceIrr = readPrice(course, ZARINPAL_PRICE_KEY)
-  const irankishPriceIrr = readPrice(course, IRANKISH_PRICE_KEY)
+  // The course's single shared price (in Iranian Rial), if the admin set one.
+  // Every active gateway charges this same amount.
+  const coursePriceIrr = readCoursePrice(course)
+
+  // Which gateways are active (configured) on this instance. The buyer chooses
+  // one of these at payment time. Public probe: no auth needed.
+  const { data: gatewaysResult } = useQuery({
+    queryKey: ['payments', 'active-gateways'],
+    queryFn: () => getActiveGateways(),
+    staleTime: 60_000,
+  })
+  const activeGateways: string[] = (() => {
+    const list = (gatewaysResult as any)?.data?.active ?? (gatewaysResult as any)?.active
+    return Array.isArray(list) ? (list as string[]) : []
+  })()
 
   // Both gateways redirect the buyer back to the course page with
   // ?payment=completed|failed (see the backend callbacks). Surface that result
@@ -398,66 +417,81 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
     );
   };
 
-  const renderBuyCard = (
-    gatewayKey: 'zarinpal' | 'irankish',
-    priceIrr: number | null,
-    onBuy: () => void
-  ) => {
-    // Only when a price is set and the buyer doesn't already have access.
-    if (priceIrr === null || isStarted) return null;
+  // One buy button per gateway. The checkout handler differs by gateway (GET
+  // redirect vs. POST form), but every button buys at the same shared price.
+  const gatewayCheckout: Record<'zarinpal' | 'irankish', () => void> = {
+    zarinpal: handleZarinPalCheckout,
+    irankish: handleIranKishCheckout,
+  };
 
-    const formattedPrice = formatCurrency(priceIrr, 'IRR', i18n.language);
-    const gatewayLabel = t(`courses.gateways.${gatewayKey}`);
-    const isLoadingThis = checkoutLoading === gatewayKey;
+  // A single card showing the shared price, with a button per ACTIVE gateway so
+  // the buyer chooses how to pay. Rendered only when a price is set, the buyer
+  // lacks access, and at least one gateway is active.
+  const renderBuyCards = () => {
+    if (isStarted || coursePriceIrr === null) return null;
+    const buyableGateways = activeGateways.filter(
+      (g): g is 'zarinpal' | 'irankish' => g === 'zarinpal' || g === 'irankish'
+    );
+    if (buyableGateways.length === 0) return null;
+
+    const formattedPrice = formatCurrency(coursePriceIrr, 'IRR', i18n.language);
     const anyLoading = checkoutLoading !== null;
 
     return (
-      <div className="bg-white rounded-xl nice-shadow overflow-hidden">
-        <div className="px-4 py-2 flex items-center gap-2 bg-emerald-50">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
-            <Banknote size={12} /> {gatewayLabel}
-          </span>
-        </div>
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-base leading-snug">
-                {t('courses.purchase_course_title')}
-              </p>
-              <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                {t('courses.paid_course_description')}
-              </p>
+      <>
+        <div className="bg-white rounded-xl nice-shadow overflow-hidden">
+          <div className="px-4 py-2 flex items-center gap-2 bg-emerald-50">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+              <Banknote size={12} /> {t('courses.purchase_course_title')}
+            </span>
+          </div>
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-base leading-snug">
+                  {t('courses.purchase_course_title')}
+                </p>
+                <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                  {t('courses.paid_course_description')}
+                </p>
+              </div>
+              <div className="shrink-0 text-end">
+                <div className="text-xl font-black text-gray-900">{formattedPrice}</div>
+              </div>
             </div>
-            <div className="shrink-0 text-end">
-              <div className="text-xl font-black text-gray-900">{formattedPrice}</div>
+
+            {buyableGateways.length > 1 && (
+              <p className="text-xs text-gray-500 mt-3">
+                {t('courses.choose_payment_gateway')}
+              </p>
+            )}
+
+            <div className="mt-2 space-y-2">
+              {buyableGateways.map((gatewayKey) => {
+                const gatewayLabel = t(`courses.gateways.${gatewayKey}`);
+                const isLoadingThis = checkoutLoading === gatewayKey;
+                return (
+                  <button
+                    key={gatewayKey}
+                    onClick={gatewayCheckout[gatewayKey]}
+                    disabled={anyLoading}
+                    aria-label={t('courses.buy_course_with', { gateway: gatewayLabel })}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-sm transition-colors cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-400 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingThis ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        {t('courses.buy_course_with', { gateway: gatewayLabel })}
+                        <ArrowRight size={13} />
+                      </>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <button
-            onClick={onBuy}
-            disabled={anyLoading}
-            aria-label={t('courses.buy_course_with', { gateway: gatewayLabel })}
-            className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-sm transition-colors cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-400 disabled:cursor-not-allowed"
-          >
-            {isLoadingThis ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                {t('courses.buy_course_with', { gateway: gatewayLabel })}
-                <ArrowRight size={13} />
-              </>
-            )}
-          </button>
         </div>
-      </div>
-    );
-  };
-
-  const renderBuyCards = () => {
-    if (isStarted || (zarinpalPriceIrr === null && irankishPriceIrr === null)) return null;
-    return (
-      <>
-        {renderBuyCard('zarinpal', zarinpalPriceIrr, handleZarinPalCheckout)}
-        {renderBuyCard('irankish', irankishPriceIrr, handleIranKishCheckout)}
       </>
     );
   };

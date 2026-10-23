@@ -31,12 +31,12 @@ from src.db.irankish import (
 )
 from src.db.users import PublicUser
 from src.security.auth import get_current_user
+from src.services.payments.pricing import set_course_price
 from src.services.payments.irankish.client import is_irankish_enabled
 from src.services.payments.irankish.irankish import (
     create_checkout,
     get_payment,
     handle_callback,
-    set_course_price,
     to_read,
 )
 

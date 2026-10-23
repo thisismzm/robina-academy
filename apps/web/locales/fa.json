@@ -439,6 +439,7 @@
     "paid_course_description": "این دوره برای دسترسی به محتوای آن نیاز به خرید دارد.",
     "buy_course": "خرید دوره",
     "buy_course_with": "خرید با {{gateway}}",
+    "choose_payment_gateway": "روش پرداخت را انتخاب کنید:",
     "gateways": {
       "zarinpal": "زرین‌پال",
       "irankish": "ایران‌کیش"
@@ -2188,6 +2189,9 @@
         "price_help": "مبلغ به ریال. برای حذف قیمت و خارج‌کردن دوره از فروش، خالی بگذارید.",
         "price_preview": "خریداران مبلغ {{price}} پرداخت می‌کنند",
         "price_invalid": "یک عدد صحیح مثبت به ریال وارد کنید یا خالی بگذارید.",
+        "active_gateways_label": "خریداران می‌توانند از این درگاه‌ها پرداخت کنند:",
+        "no_gateway_title": "هیچ درگاه پرداختی پیکربندی نشده است",
+        "no_gateway_description": "این نمونه اطلاعات زرین‌پال یا ایران‌کیش ندارد، بنابراین امکان دریافت وجه نیست. برای فعال‌سازی خرید، متغیر LEARNHOUSE_ZARINPAL_MERCHANT_ID یا متغیرهای LEARNHOUSE_IRANKISH_* را روی سرور تنظیم کنید.",
         "not_configured_title": "{{gateway}} پیکربندی نشده است",
         "not_configured_description_zarinpal": "این نمونه شناسه پذیرنده زرین‌پال ندارد، بنابراین امکان دریافت وجه نیست. برای فعال‌سازی خرید، متغیر LEARNHOUSE_ZARINPAL_MERCHANT_ID را روی سرور تنظیم کنید.",
         "not_configured_description_irankish": "این نمونه اطلاعات ترمینال ایران‌کیش ندارد، بنابراین امکان دریافت وجه نیست. برای فعال‌سازی خرید، متغیرهای LEARNHOUSE_IRANKISH_* را روی سرور تنظیم کنید."
