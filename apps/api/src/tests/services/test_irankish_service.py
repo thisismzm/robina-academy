@@ -19,6 +19,10 @@ from src.db.irankish import IranKishPayment, IranKishPaymentStatusEnum
 from src.db.usergroup_resources import UserGroupResource
 from src.db.usergroup_user import UserGroupUser
 from src.services.payments.irankish import irankish as svc
+from src.services.payments.pricing import (
+    COURSE_PRICE_METADATA_KEY,
+    set_course_price,
+)
 
 
 def _fake_config():
@@ -61,18 +65,20 @@ def patch_envelope():
 
 
 async def test_set_course_price_sets_and_clears(db, org, admin_user, course, mock_request):
-    await svc.set_course_price(mock_request, db, org.id, course.id, 150000, admin_user)
+    # Price is stored under the shared, gateway-agnostic key so ZarinPal and
+    # IranKish always charge the same amount.
+    await set_course_price(mock_request, db, org.id, course.id, 150000, admin_user)
     await db.refresh(course)
-    assert (course.extra_metadata or {})[svc.PRICE_METADATA_KEY] == 150000
+    assert (course.extra_metadata or {})[COURSE_PRICE_METADATA_KEY] == 150000
 
-    await svc.set_course_price(mock_request, db, org.id, course.id, None, admin_user)
+    await set_course_price(mock_request, db, org.id, course.id, None, admin_user)
     await db.refresh(course)
-    assert svc.PRICE_METADATA_KEY not in (course.extra_metadata or {})
+    assert COURSE_PRICE_METADATA_KEY not in (course.extra_metadata or {})
 
 
 async def test_set_course_price_rejects_non_positive(db, org, admin_user, course, mock_request):
     with pytest.raises(HTTPException) as ei:
-        await svc.set_course_price(mock_request, db, org.id, course.id, 0, admin_user)
+        await set_course_price(mock_request, db, org.id, course.id, 0, admin_user)
     assert ei.value.status_code == 400
 
 
@@ -106,7 +112,7 @@ async def test_checkout_creates_pending_payment_and_returns_token(
     db, org, admin_user, course, mock_request, patch_config, patch_envelope
 ):
     # Price the course first.
-    await svc.set_course_price(mock_request, db, org.id, course.id, 250000, admin_user)
+    await set_course_price(mock_request, db, org.id, course.id, 250000, admin_user)
 
     with patch(
         "src.services.payments.irankish.irankish.irankish_client.make_token",
@@ -132,7 +138,7 @@ async def test_checkout_creates_pending_payment_and_returns_token(
 async def test_checkout_marks_failed_when_token_call_fails(
     db, org, admin_user, course, mock_request, patch_config, patch_envelope
 ):
-    await svc.set_course_price(mock_request, db, org.id, course.id, 250000, admin_user)
+    await set_course_price(mock_request, db, org.id, course.id, 250000, admin_user)
 
     from src.services.payments.irankish.client import IranKishError
 
@@ -158,7 +164,7 @@ async def test_checkout_marks_failed_when_token_call_fails(
 
 
 async def _start_payment(db, org, user, course, mock_request):
-    await svc.set_course_price(mock_request, db, org.id, course.id, 100000, user)
+    await set_course_price(mock_request, db, org.id, course.id, 100000, user)
     with patch(
         "src.services.payments.irankish.irankish.irankish_client.make_token",
         new=AsyncMock(return_value="TOKEN-CB"),

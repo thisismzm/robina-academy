@@ -32,12 +32,12 @@ from src.db.zarinpal import (
     ZarinPalPaymentRead,
 )
 from src.security.auth import get_current_user
+from src.services.payments.pricing import set_course_price
 from src.services.payments.zarinpal.client import is_zarinpal_enabled
 from src.services.payments.zarinpal.zarinpal import (
     create_checkout,
     get_payment,
     handle_callback,
-    set_course_price,
 )
 
 logger = logging.getLogger(__name__)

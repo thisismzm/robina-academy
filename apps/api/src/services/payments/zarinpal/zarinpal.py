@@ -10,9 +10,11 @@ Pricing model
 -------------
 Since the full offers/enrollments subsystem is an Enterprise-Edition feature not
 present in this edition, a course's IRR price is stored on the course itself, in
-``course.extra_metadata['zarinpal_price_irr']`` (a positive integer in Rial). A
-course with no price set is not purchasable through this gateway. An org admin
-sets the price with ``set_course_price``.
+``course.extra_metadata['course_price_irr']`` (a positive integer in Rial). The
+price is shared across gateways, so ZarinPal and IranKish always charge the same
+amount; both read and write it through ``services.payments.pricing``. A course
+with no price set is not purchasable. An org admin sets the price with
+``set_course_price`` (re-exported here from the shared pricing module).
 
 Granting access
 ----------------
@@ -56,6 +58,7 @@ from src.db.zarinpal import (
 from src.security.auth import resolve_acting_user_id
 from src.security.org_auth import require_org_role_permission
 from src.security.rbac.rbac import authorization_verify_if_user_is_anon
+from src.services.payments.pricing import read_course_price
 from src.services.payments.zarinpal import client as zarinpal_client
 from src.services.payments.zarinpal.client import (
     ZarinPalError,
@@ -65,8 +68,6 @@ from src.services.payments.zarinpal.client import (
 
 logger = logging.getLogger(__name__)
 
-# Key under which a course stores its IRR price for this gateway.
-PRICE_METADATA_KEY = "zarinpal_price_irr"
 # The value ZarinPal sends in the callback ``Status`` param on a paid return.
 STATUS_OK = "OK"
 
@@ -126,19 +127,6 @@ async def _get_course_or_404(
     return course
 
 
-def _course_price(course: Course) -> Optional[int]:
-    """Return the course's IRR price, or None if it is not set for sale."""
-    meta = course.extra_metadata or {}
-    raw = meta.get(PRICE_METADATA_KEY)
-    if raw is None:
-        return None
-    try:
-        price = int(raw)
-    except (TypeError, ValueError):
-        return None
-    return price if price > 0 else None
-
-
 async def _is_org_member(db_session: AsyncSession, user_id: int, org_id: int) -> bool:
     row = (
         await db_session.execute(
@@ -154,45 +142,11 @@ async def _is_org_member(db_session: AsyncSession, user_id: int, org_id: int) ->
 # ---------------------------------------------------------------------------
 # Pricing admin
 # ---------------------------------------------------------------------------
-
-
-async def set_course_price(
-    request: Request,
-    db_session: AsyncSession,
-    org_id: int,
-    course_id: int,
-    price_irr: Optional[int],
-    current_user: PublicUser | AnonymousUser | APITokenUser,
-) -> dict:
-    """Set (or clear, with ``None``) a course's ZarinPal price, admin-only.
-
-    A non-positive price is rejected; passing ``None`` removes the price and
-    makes the course no longer purchasable through this gateway.
-    """
-    acting_user_id = resolve_acting_user_id(current_user)
-    await authorization_verify_if_user_is_anon(acting_user_id)
-    await _get_org_or_404(db_session, org_id)
-    await require_org_role_permission(
-        acting_user_id, org_id, db_session, "courses", "action_update"
-    )
-
-    if price_irr is not None and price_irr <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="price_irr must be a positive integer (amount in Rial).",
-        )
-
-    course = await _get_course_or_404(db_session, org_id, course_id)
-    meta = dict(course.extra_metadata or {})
-    if price_irr is None:
-        meta.pop(PRICE_METADATA_KEY, None)
-    else:
-        meta[PRICE_METADATA_KEY] = int(price_irr)
-    course.extra_metadata = meta
-    course.update_date = str(datetime.now())
-    db_session.add(course)
-    await db_session.commit()
-    return {"course_id": course_id, "price_irr": price_irr}
+#
+# Pricing is shared across gateways: the admin price-setter and the price
+# reader both live in ``services.payments.pricing`` so a course always sells for
+# the same amount on ZarinPal and IranKish. ``set_course_price`` is re-exported
+# here unchanged so the router import keeps working.
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +185,7 @@ async def create_checkout(
         raise _translate_zarinpal_error(ZarinPalNotConfigured())
 
     course = await _get_course_or_404(db_session, org_id, course_id)
-    price = _course_price(course)
+    price = read_course_price(course)
     if price is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
