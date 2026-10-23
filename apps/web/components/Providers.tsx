@@ -1,5 +1,8 @@
 'use client'
 import React, { useState } from 'react'
+// Side-effect import: silences React 19's false-positive "Encountered a script
+// tag" console error for our synchronous <head> scripts (see the module for why).
+import '../lib/suppress-script-tag-warning'
 import '../lib/i18n'
 import { SessionProvider } from '@components/Contexts/AuthContext'
 import LHSessionProvider from '@components/Contexts/LHSessionContext'

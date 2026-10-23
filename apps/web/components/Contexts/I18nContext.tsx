@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import i18n from '../../lib/i18n'
+import i18n, { applyDetectedLanguage } from '../../lib/i18n'
 import { applyDocumentDirection } from '../../lib/direction'
 
 export default function I18nProvider({ children }: { children: React.ReactNode }) {
@@ -24,6 +24,14 @@ export default function I18nProvider({ children }: { children: React.ReactNode }
       setLang(lng)
     }
     i18n.on('languageChanged', handleLanguageChanged)
+
+    // i18next is pinned to 'en' at init so the server HTML and the first client
+    // render are identical (no hydration mismatch). Now that we've mounted,
+    // resolve the user's real language and switch to it; the listener above
+    // re-renders the tree and updates <html lang/dir>. The 'en' → detected swap
+    // happens after paint, so React never sees mismatched text.
+    void applyDetectedLanguage()
+
     return () => {
       i18n.off('languageChanged', handleLanguageChanged)
     }

@@ -53,6 +53,14 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
+    // The FIRST client render must reproduce the server's HTML exactly, or
+    // React throws a hydration mismatch (the server has no access to
+    // localStorage/cookie/navigator, so it always renders English). We
+    // therefore pin the initial language to 'en' and let LanguageDetector run
+    // only AFTER mount, via applyDetectedLanguage() below (called from
+    // I18nProvider's effect). The detector plugin stays registered so its
+    // caches (localStorage + cookie) keep working for changeLanguage().
+    lng: 'en',
     fallbackLng: 'en',
     ns: ['common'],
     defaultNS: 'common',
@@ -70,15 +78,6 @@ i18n
     }
   });
 
-// Load the detected language if it's not English, and export the promise
-// so I18nProvider can wait for resources before rendering.
-// The date locale rides along: dayjs keeps its own registry, and without this
-// every "2 hours ago" renders in English no matter the language.
-export const initialLocaleReady = Promise.all([
-  loadLocale(i18n.language.split('-')[0]),
-  loadDateLocale(i18n.language),
-]).then(() => undefined);
-
 /**
  * Switch language safely: preloads the bundle before switching
  * so the UI never flashes English as a fallback.
@@ -86,6 +85,29 @@ export const initialLocaleReady = Promise.all([
 export async function changeLanguage(lng: string) {
   await Promise.all([loadLocale(lng), loadDateLocale(lng)])
   return i18n.changeLanguage(lng)
+}
+
+/**
+ * Resolve the user's real language and apply it. MUST be called only after the
+ * React tree has mounted (i.e. from an effect), never during render: i18next is
+ * initialised with lng:'en' so the first client render matches the server, and
+ * this is what then moves the UI to the detected locale.
+ *
+ * Runs the exact same detection LanguageDetector would have (localStorage →
+ * cookie → querystring → navigator), preloads the bundle + dayjs locale, then
+ * switches. No-op on the server and when the detected language is already
+ * English, so hydration is never disturbed.
+ */
+export async function applyDetectedLanguage(): Promise<void> {
+  if (typeof window === 'undefined') return
+  const detected = (i18n.services.languageDetector?.detect() as
+    | string
+    | string[]
+    | undefined)
+  const lng = Array.isArray(detected) ? detected[0] : detected
+  const code = (lng || 'en').split('-')[0]
+  if (!code || code === i18n.language.split('-')[0]) return
+  await changeLanguage(lng || code)
 }
 
 export default i18n;
