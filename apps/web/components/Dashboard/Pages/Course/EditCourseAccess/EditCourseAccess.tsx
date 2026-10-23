@@ -5,7 +5,7 @@ import Modal from '@components/Objects/StyledElements/Modal/Modal'
 import { getAPIUrl } from '@services/config/config'
 import { unLinkResourcesToUserGroup } from '@services/usergroups/usergroups'
 import { apiFetch } from '@services/utils/ts/requests'
-import { Check, Globe, SquareUserRound, Users, X } from 'lucide-react'
+import { Check, Globe, ShoppingCart, SquareUserRound, Users, X } from 'lucide-react'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useOrg } from '@components/Contexts/OrgContext'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
@@ -134,11 +134,39 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
         previousPublicRef.current = isClientPublic;
     }, [isClientPublic, isLoading, isSaving, syncChanges]);
 
+    // "Requires purchase" is independent of public/private: the course stays
+    // visible for preview, but enrollment needs a completed purchase.
+    const [requiresPurchase, setRequiresPurchase] = useState<boolean | undefined>(undefined);
+    const hasInitPurchaseRef = useRef(false);
+    const prevPurchaseRef = useRef<boolean | undefined>(undefined);
+
+    useEffect(() => {
+        if (!isLoading && courseStructure?.requires_purchase !== undefined && !hasInitPurchaseRef.current) {
+            setRequiresPurchase(!!courseStructure.requires_purchase);
+            prevPurchaseRef.current = !!courseStructure.requires_purchase;
+            hasInitPurchaseRef.current = true;
+        }
+    }, [isLoading, courseStructure?.requires_purchase]);
+
+    useEffect(() => {
+        if (!hasInitPurchaseRef.current || isLoading || isSaving) return;
+        if (requiresPurchase === undefined) return;
+        if (requiresPurchase === prevPurchaseRef.current) return;
+
+        syncChanges({ requires_purchase: requiresPurchase }, true);
+        prevPurchaseRef.current = requiresPurchase;
+    }, [requiresPurchase, isLoading, isSaving, syncChanges]);
+
     // useCourseFieldSync flushes pending edits on unmount.
 
     const handleSetPublic = useCallback((value: boolean) => {
         setIsClientPublic(value);
         track(AnalyticsEvent.CourseAccessChanged, { new_access: value ? 'public' : 'users_only' });
+    }, [track]);
+
+    const handleSetRequiresPurchase = useCallback((value: boolean) => {
+        setRequiresPurchase(value);
+        track(AnalyticsEvent.CourseAccessChanged, { new_access: value ? 'purchasable' : 'free' });
     }, [track]);
 
     if (!courseStructure) return null;
@@ -223,6 +251,42 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
                                 )}
                             </>
                         )}
+                    </div>
+                </div>
+
+                {/* Enrollment: requires purchase toggle */}
+                <div className="px-6 py-5 border-b border-gray-100">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                <ShoppingCart size={18} strokeWidth={1.75} />
+                            </div>
+                            <div className="min-w-0">
+                                <h2 className="font-bold text-base text-gray-800">
+                                    {t('dashboard.courses.access.requires_purchase.title')}
+                                </h2>
+                                <p className="text-sm text-gray-500 mt-0.5 leading-snug max-w-[520px]">
+                                    {t('dashboard.courses.access.requires_purchase.description')}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={requiresPurchase === true}
+                            aria-label={t('dashboard.courses.access.requires_purchase.title')}
+                            disabled={requiresPurchase === undefined || isSaving}
+                            onClick={() => handleSetRequiresPurchase(!requiresPurchase)}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                                requiresPurchase ? 'bg-emerald-600' : 'bg-gray-200'
+                            }`}
+                        >
+                            <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-150 ${
+                                    requiresPurchase ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                            />
+                        </button>
                     </div>
                 </div>
 

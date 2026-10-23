@@ -45,6 +45,79 @@ async def _get_offer_for_usergroup(usergroup_id: int, db_session: AsyncSession) 
     return None
 
 
+async def user_has_course_entitlement(
+    course_uuid: str,
+    user_id: int,
+    db_session: AsyncSession,
+) -> bool:
+    """
+    Return True if the user already holds an entitlement to enroll in a
+    purchasable course.
+
+    An entitlement is granted either by:
+      1. Membership in a UserGroup that is linked to the course (which is how a
+         completed purchase grants access — see payments_to_offers_migration),
+         or
+      2. A paid enrollment recognized by the optional payments ("ee") module.
+
+    Authors / admins / maintainers are NOT resolved here; they are granted
+    earlier in the enrollment flow via the standard read-access check, so they
+    are never blocked by the paywall on a course they own or manage.
+    """
+    if user_id == 0:
+        return False
+
+    # 1. UserGroup membership linked to the course grants the entitlement.
+    usergroup_stmt = select(UserGroupResource).where(
+        UserGroupResource.resource_uuid == course_uuid
+    )
+    usergroup_resources = (await db_session.execute(usergroup_stmt)).scalars().all()
+    usergroup_ids = [ugr.usergroup_id for ugr in usergroup_resources]
+
+    if usergroup_ids:
+        membership_stmt = select(UserGroupUser).where(
+            UserGroupUser.usergroup_id.in_(usergroup_ids),
+            UserGroupUser.user_id == user_id,
+        )
+        membership = (await db_session.execute(membership_stmt)).scalars().first()
+        if membership is not None:
+            return True
+
+    # 2. Paid enrollment recognized by the payments module (if installed).
+    try:
+        from ee.services.payments.payments_access import check_enrollment_access
+        if await check_enrollment_access(course_uuid, user_id, db_session):
+            return True
+    except Exception:
+        pass  # payments module not available (community edition), skip silently
+
+    return False
+
+
+async def get_course_offer_metadata(
+    course_uuid: str,
+    db_session: AsyncSession,
+) -> dict | None:
+    """
+    Return the paid-offer metadata for a course, if the course is linked to a
+    UserGroup that backs a PaymentsOffer. Returns None when no offer is found
+    (e.g. community edition without the payments module, or a purchasable
+    course that has not been wired to an offer yet).
+
+    The returned shape mirrors the HTTP 402 payload produced by
+    check_usergroup_access so callers can surface a consistent payment prompt.
+    """
+    usergroup_stmt = select(UserGroupResource).where(
+        UserGroupResource.resource_uuid == course_uuid
+    )
+    usergroup_resources = (await db_session.execute(usergroup_stmt)).scalars().all()
+    for ugr in usergroup_resources:
+        offer_meta = await _get_offer_for_usergroup(ugr.usergroup_id, db_session)
+        if offer_meta:
+            return offer_meta
+    return None
+
+
 async def check_usergroup_access(
     resource_uuid: str,
     user_id: int,

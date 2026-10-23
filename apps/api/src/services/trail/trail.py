@@ -22,6 +22,10 @@ from src.services.audit.audit import record_audit_event
 from src.db.user_audit_events import UserAuditEventType
 from src.services.webhooks.dispatch import dispatch_webhooks
 from src.security.rbac import check_resource_access, AccessAction
+from src.security.rbac.rbac import (
+    user_has_course_entitlement,
+    get_course_offer_metadata,
+)
 from src.security.org_auth import require_org_membership
 from src.services.courses.activities.access import verify_activity_reader_access
 
@@ -263,6 +267,12 @@ async def add_activity_to_trail(
     # learner may actually consume (published, paid for, unlocked) counts.
     await verify_activity_reader_access(request, activity, course, user, db_session)
 
+    # Starting an activity implicitly enrolls the learner, so a purchasable
+    # course must be gated here too — otherwise a learner could bypass the
+    # enrollment paywall by jumping straight into an activity.
+    if course.requires_purchase:
+        await _verify_enrollment_purchase(request, user, course, db_session)
+
     trail = await check_trail_presence(
         org_id=course.org_id,
         user_id=user.id,
@@ -468,6 +478,51 @@ async def remove_activity_from_trail(
     return await _build_trail_read(trail, list(trail_runs_raw), db_session, user_id=user.id)
 
 
+async def _verify_enrollment_purchase(
+    request: Request,
+    user: PublicUser,
+    course: Course,
+    db_session: AsyncSession,
+) -> None:
+    """
+    Gate enrollment into a purchasable course.
+
+    Allows the enrollment to proceed when the user is a course owner/manager
+    (author, admin, maintainer) or already holds an entitlement (UserGroup
+    membership backing the offer, or a paid enrollment). Otherwise raises
+    HTTP 402 Payment Required with the course's offer metadata so the client
+    can prompt for purchase.
+    """
+    # Owners/managers are never paywalled on a course they own or manage.
+    # An UPDATE access check resolves authorship/admin/maintainer without
+    # triggering the read paywall.
+    owner_decision = await check_resource_access(
+        request,
+        db_session,
+        user,
+        course.course_uuid,
+        AccessAction.UPDATE,
+        raise_on_deny=False,
+    )
+    if owner_decision.allowed:
+        return
+
+    # Users with an existing entitlement (membership / paid enrollment) proceed.
+    if await user_has_course_entitlement(course.course_uuid, user.id, db_session):
+        return
+
+    # No entitlement: surface a payment prompt. Include offer metadata when the
+    # course is wired to a paid offer so the client can start checkout.
+    offer_meta = await get_course_offer_metadata(course.course_uuid, db_session)
+    detail: dict = {"code": "PAYMENT_REQUIRED", "course_uuid": course.course_uuid}
+    if offer_meta:
+        detail.update(offer_meta)
+    raise HTTPException(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        detail=detail,
+    )
+
+
 async def add_course_to_trail(
     request: Request,
     user: PublicUser | AnonymousUser,
@@ -491,6 +546,13 @@ async def add_course_to_trail(
     await check_resource_access(
         request, db_session, user, course.course_uuid, AccessAction.READ
     )
+
+    # Purchasable courses: the READ check above only gates VIEWING (preview /
+    # listing). Enrollment additionally requires a completed purchase. Course
+    # owners/managers (authors, admins, maintainers) and users who already hold
+    # an entitlement are let through; everyone else gets HTTP 402.
+    if course.requires_purchase:
+        await _verify_enrollment_purchase(request, user, course, db_session)
 
     # check if run already exists
     statement = select(TrailRun).where(

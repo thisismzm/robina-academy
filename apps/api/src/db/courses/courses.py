@@ -60,6 +60,10 @@ class CourseBase(SQLModel):
     public: bool
     published: bool = Field(default=False)
     open_to_contributors: bool
+    # When True, the course is visible for preview (listing + course page) to
+    # anyone who can read it, but enrolling requires a completed purchase.
+    # Viewing is unaffected; only enrollment (add_course_to_trail) is gated.
+    requires_purchase: bool = Field(default=False)
 
 
 class Course(CourseBase, table=True):
@@ -103,6 +107,7 @@ class CourseUpdate(SQLModel):
     public: Optional[bool] = None
     published: Optional[bool] = None
     open_to_contributors: Optional[bool] = None
+    requires_purchase: Optional[bool] = None
     seo: Optional[dict] = None
     extra_metadata: Optional[dict] = None
 
