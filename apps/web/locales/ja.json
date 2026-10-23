@@ -407,6 +407,7 @@
     "start_course_success": "コースを正常に開始しました",
     "leave_course_error": "コースの退会に失敗しました。後でもう一度お試しください。",
     "start_course_error": "コースの開始に失敗しました。後でもう一度お試しください。",
+    "purchase_required": "このコースに登録するには購入が必要です。",
     "you_own_this_course": "このコースを所有しています",
     "you_own_this_course_description": "このコースを購入済みです。すべてのコンテンツにフルアクセスできます。",
     "paid_course": "有料コース",
@@ -1621,6 +1622,10 @@
           "confirmation_title": "ユーザー限定に変更しますか？",
           "confirmation_message": "本当にこのコースをサインイン済みのユーザー限定にしますか？",
           "confirmation_button": "ユーザー限定に変更"
+        },
+        "requires_purchase": {
+          "title": "登録には購入が必要です",
+          "description": "コースを閲覧できる人は誰でもプレビューを見られますが、登録には購入の完了が必要です。有料オファーをリンクするか価格を設定して、購入者がチェックアウトできるようにしてください。"
         },
         "usergroups": {
           "title": "ユーザーグループ",

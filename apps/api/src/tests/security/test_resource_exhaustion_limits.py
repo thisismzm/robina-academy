@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 
@@ -559,6 +559,11 @@ def _gzip_test_app() -> FastAPI:
 
         return StreamingResponse(_events(), media_type="text/event-stream")
 
+    @application.get("/redirect")
+    async def _redirect():
+        # No Content-Type and an empty body, like the payment gateway callbacks.
+        return RedirectResponse(url="http://example.test/target", status_code=302)
+
     return application
 
 
@@ -597,6 +602,21 @@ class TestSelectiveGZip:
 
         assert stream_resp.headers.get("content-encoding") is None
         assert stream_resp.content == b"\x00" * 10000
+
+    async def test_redirect_without_content_type_is_sent(self):
+        """A bare redirect has no Content-Type; passing it through must still
+        emit the response start, or the server fails the request with a 500."""
+        application = _gzip_test_app()
+        async with AsyncClient(
+            transport=ASGITransport(app=application), base_url="http://test"
+        ) as client:
+            resp = await client.get(
+                "/redirect", headers={"Accept-Encoding": "gzip, deflate, br"}
+            )
+
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "http://example.test/target"
+        assert resp.headers.get("content-encoding") is None
 
     async def test_identity_path_is_untouched_without_accept_encoding(self):
         application = _gzip_test_app()

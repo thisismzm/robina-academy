@@ -397,6 +397,7 @@
     "start_course_success": "Hai iniziato il corso con successo",
     "leave_course_error": "Impossibile abbandonare il corso. Riprova più tardi.",
     "start_course_error": "Impossibile iniziare il corso. Riprova più tardi.",
+    "purchase_required": "Questo corso richiede un acquisto prima di poterti iscrivere.",
     "you_own_this_course": "Possiedi questo corso",
     "you_own_this_course_description": "Hai acquistato questo corso e hai pieno accesso a tutti i contenuti.",
     "paid_course": "Corso a pagamento",
@@ -1611,6 +1612,10 @@
           "confirmation_title": "Passare a Solo utenti?",
           "confirmation_message": "Sei sicuro di volere che questo corso sia accessibile solo agli utenti registrati?",
           "confirmation_button": "Passa a Solo utenti"
+        },
+        "requires_purchase": {
+          "title": "Richiede l'acquisto per iscriversi",
+          "description": "Chiunque possa vedere il corso ne vede l'anteprima, ma l'iscrizione richiede un acquisto completato. Collega un'offerta a pagamento o imposta un prezzo così che gli acquirenti possano completare il pagamento."
         },
         "usergroups": {
           "title": "Gruppi utenti",

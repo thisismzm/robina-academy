@@ -19,19 +19,27 @@ the old scheme keep working; ``set_course_price`` writes the shared key and
 removes the legacy keys so the shared value becomes the single source of truth.
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import HTTPException, Request, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.courses.courses import Course
+from src.db.irankish import IranKishPayment, IranKishPaymentStatusEnum
 from src.db.organizations import Organization
+from src.db.trail_runs import TrailRun
+from src.db.trails import Trail
 from src.db.users import AnonymousUser, APITokenUser, PublicUser
+from src.db.zarinpal import ZarinPalPayment, ZarinPalPaymentStatusEnum
 from src.security.auth import resolve_acting_user_id
 from src.security.org_auth import require_org_role_permission
 from src.security.rbac.rbac import authorization_verify_if_user_is_anon
+
+logger = logging.getLogger(__name__)
 
 # The single key a course's IRR price is stored under, shared by all gateways.
 COURSE_PRICE_METADATA_KEY = "course_price_irr"
@@ -135,3 +143,122 @@ async def set_course_price(
     db_session.add(course)
     await db_session.commit()
     return {"course_id": course_id, "price_irr": price_irr}
+
+
+# ---------------------------------------------------------------------------
+# Paid-course access gate
+# ---------------------------------------------------------------------------
+
+
+async def user_has_paid_course_access(
+    db_session: AsyncSession, user_id: int, course: Course
+) -> bool:
+    """Whether ``user_id`` has a completed purchase of ``course`` (any gateway).
+
+    The payment ledger is the single source of truth for "who paid": a
+    ``COMPLETED`` row in ``ZarinPalPayment`` or ``IranKishPayment`` for this
+    user + course means the purchase settled. We no longer infer payment from
+    UserGroup membership, because a UserGroup linked to a course is a *access
+    restriction* (a cohort gate), not a record of purchase — conflating the two
+    let a buyer's membership satisfy, or be satisfied by, an unrelated
+    restriction group. Keeping payment in the ledger keeps the two concerns
+    separate.
+
+    Whether the course is viewable (public, or restricted to a UserGroup) is an
+    independent concern enforced by the access layer; this function is only
+    about payment and never consults UserGroups.
+
+    A ``user_id`` of 0 (anonymous / API token) never has paid access.
+    """
+    if not user_id:
+        return False
+
+    zarinpal = (
+        await db_session.execute(
+            select(ZarinPalPayment.id).where(
+                ZarinPalPayment.course_id == course.id,
+                ZarinPalPayment.user_id == user_id,
+                ZarinPalPayment.status == ZarinPalPaymentStatusEnum.COMPLETED,
+            )
+        )
+    ).scalars().first()
+    if zarinpal is not None:
+        return True
+
+    irankish = (
+        await db_session.execute(
+            select(IranKishPayment.id).where(
+                IranKishPayment.course_id == course.id,
+                IranKishPayment.user_id == user_id,
+                IranKishPayment.status == IranKishPaymentStatusEnum.COMPLETED,
+            )
+        )
+    ).scalars().first()
+    return irankish is not None
+
+
+def course_is_paid(course: Course) -> bool:
+    """Whether the course has a gateway price set (i.e. it must be purchased)."""
+    return read_course_price(course) is not None
+
+
+async def enrol_user_in_course(
+    db_session: AsyncSession, user_id: int, course: Course
+) -> None:
+    """Enrol ``user_id`` in ``course`` (idempotent), mirroring the trail path.
+
+    A completed purchase enrols the buyer so the course shows up on their trail.
+    The gateway callback is anonymous (no ``PublicUser``), so this creates the
+    per-user/per-org ``Trail`` and the per-course ``TrailRun`` directly by id
+    rather than going through the user-object trail service.
+
+    Enrolment is idempotent: an existing ``TrailRun`` for this user+course is
+    left untouched. The row is added to the session but not committed here; the
+    caller commits it alongside the payment status flip.
+    """
+    if not user_id or course.id is None:
+        return
+
+    now = str(datetime.now())
+
+    trail = (
+        await db_session.execute(
+            select(Trail).where(
+                Trail.org_id == course.org_id, Trail.user_id == user_id
+            )
+        )
+    ).scalars().first()
+    if trail is None:
+        trail = Trail(
+            org_id=course.org_id,
+            user_id=user_id,
+            trail_uuid=f"trail_{uuid4()}",
+            creation_date=now,
+            update_date=now,
+        )
+        db_session.add(trail)
+        await db_session.flush()  # assign trail.id
+
+    existing_run = (
+        await db_session.execute(
+            select(TrailRun.id).where(
+                TrailRun.trail_id == trail.id,
+                TrailRun.course_id == course.id,
+                TrailRun.user_id == user_id,
+            )
+        )
+    ).scalars().first()
+    if existing_run is not None:
+        return
+
+    db_session.add(
+        TrailRun(
+            trail_id=trail.id if trail.id is not None else 0,
+            course_id=course.id,
+            org_id=course.org_id,
+            user_id=user_id,
+            creation_date=now,
+            update_date=now,
+        )
+    )
+    await db_session.flush()

@@ -419,6 +419,7 @@
     "start_course_success": "Kursa başarıyla başlandı",
     "leave_course_error": "Kurstan ayrılamadı. Lütfen daha sonra tekrar deneyin.",
     "start_course_error": "Kursa başlanamadı. Lütfen daha sonra tekrar deneyin.",
+    "purchase_required": "Bu kursa kaydolmadan önce satın almanız gerekir.",
     "you_own_this_course": "Bu Kursa Sahipsiniz",
     "you_own_this_course_description": "Bu kursu satın aldınız ve tüm içeriğe tam erişiminiz var.",
     "paid_course": "Ücretli Kurs",
@@ -1633,6 +1634,10 @@
           "confirmation_title": "Sadece Kullanıcılara Özelliğe Geçilsin mi?",
           "confirmation_message": "Bu kursu sadece kayıtlı kullanıcılarla sınırlamak istediğinizden emin misiniz?",
           "confirmation_button": "Sadece Kullanıcılara Geç"
+        },
+        "requires_purchase": {
+          "title": "Kaydolmak için satın alma gerekir",
+          "description": "Kursu görüntüleyebilen herkes önizlemesini görür, ancak kaydolmak için tamamlanmış bir satın alma gerekir. Alıcıların ödeme yapabilmesi için ücretli bir teklif bağlayın veya bir fiyat belirleyin."
         },
         "usergroups": {
           "title": "Kullanıcı Grupları",

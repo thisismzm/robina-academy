@@ -18,10 +18,19 @@ with no price set is not purchasable. An org admin sets the price with
 
 Granting access
 ----------------
-On a confirmed payment the buyer is granted access the same way the rest of the
-platform grants course access: a dedicated per-course "purchasers" ``UserGroup``
-holds the course as a ``UserGroupResource`` and each buyer as a ``UserGroupUser``.
-The course-visibility query already treats UserGroup membership as access.
+On a confirmed payment the buyer's access comes from the payment ledger itself:
+the ``COMPLETED`` ``IranKishPayment`` row IS the entitlement, consulted by
+``services.payments.pricing.user_has_paid_course_access``. We do NOT create a
+per-course "purchasers" UserGroup — a UserGroup linked to a course means the
+course is *restricted to that cohort*, a separate concept from "has paid", and
+conflating them let outsiders buy their way past a cohort restriction. On a
+completed payment we additionally enrol the buyer in the course (a ``TrailRun``)
+so the purchase shows up as an enrolment.
+
+Purchase and access-restriction (public vs. UserGroup) are independent concerns
+and the checkout here deliberately knows nothing about UserGroups: whether a
+course is viewable is decided entirely by the access layer, and whether it is
+paid is decided entirely by this ledger.
 """
 
 import logging
@@ -40,14 +49,10 @@ from src.db.irankish import (
 )
 from src.db.organizations import Organization
 from src.db.user_organizations import UserOrganization
-from src.db.usergroup_resources import UserGroupResource
-from src.db.usergroup_user import UserGroupUser
-from src.db.usergroups import UserGroup
 from src.db.users import AnonymousUser, APITokenUser, PublicUser
 from src.security.auth import resolve_acting_user_id
 from src.security.org_auth import require_org_role_permission
 from src.security.rbac.rbac import authorization_verify_if_user_is_anon
-from src.services.payments.pricing import read_course_price
 from src.services.payments.irankish import client as irankish_client
 from src.services.payments.irankish.client import (
     IranKishError,
@@ -57,6 +62,11 @@ from src.services.payments.irankish.client import (
 from src.services.payments.irankish.crypto import (
     EnvelopeError,
     make_authentication_envelope,
+)
+from src.services.payments.pricing import (
+    enrol_user_in_course,
+    read_course_price,
+    user_has_paid_course_access,
 )
 
 logger = logging.getLogger(__name__)
@@ -373,86 +383,32 @@ async def handle_callback(
 
 
 # ---------------------------------------------------------------------------
-# Access granting via UserGroup membership
+# Access granting via the payment ledger
 # ---------------------------------------------------------------------------
-
-
-def _purchasers_group_name(course: Course) -> str:
-    return f"IranKish purchasers: {course.name}"[:255]
-
-
-async def _get_or_create_purchasers_group(
-    db_session: AsyncSession, course: Course
-) -> UserGroup:
-    """Return the per-course purchasers UserGroup, creating + linking it once.
-
-    The group is identified by the course it holds as a resource, so repeated
-    purchases of the same course reuse the same group.
-    """
-    linked = (
-        await db_session.execute(
-            select(UserGroup)
-            .join(UserGroupResource, UserGroupResource.usergroup_id == UserGroup.id)
-            .where(
-                UserGroupResource.resource_uuid == course.course_uuid,
-                UserGroup.org_id == course.org_id,
-                UserGroup.name == _purchasers_group_name(course),
-            )
-        )
-    ).scalars().first()
-    if linked:
-        return linked
-
-    now = str(datetime.now())
-    group = UserGroup(
-        name=_purchasers_group_name(course),
-        description="Auto-created: users who purchased this course via IranKish.",
-        org_id=course.org_id,
-        usergroup_uuid=f"usergroup_{uuid4()}",
-        creation_date=now,
-        update_date=now,
-    )
-    db_session.add(group)
-    await db_session.flush()  # assign group.id
-
-    # Link the course to the group so group membership grants course access.
-    db_session.add(
-        UserGroupResource(
-            usergroup_id=group.id,  # type: ignore[arg-type]
-            resource_uuid=course.course_uuid,
-            org_id=course.org_id,
-            creation_date=now,
-            update_date=now,
-        )
-    )
-    await db_session.flush()
-    return group
 
 
 async def _user_has_course_access(
     db_session: AsyncSession, user_id: int, course: Course
 ) -> bool:
-    """Whether the user is already a member of a group that holds this course."""
-    row = (
-        await db_session.execute(
-            select(UserGroupUser.id)
-            .join(
-                UserGroupResource,
-                UserGroupResource.usergroup_id == UserGroupUser.usergroup_id,
-            )
-            .where(
-                UserGroupResource.resource_uuid == course.course_uuid,
-                UserGroupUser.user_id == user_id,
-            )
-        )
-    ).scalars().first()
-    return row is not None
+    """Whether the user already holds a completed purchase of this course.
+
+    Reads the shared payment ledger (both gateways), so a buyer who paid through
+    ZarinPal is recognised here too and is not charged twice.
+    """
+    return await user_has_paid_course_access(db_session, user_id, course)
 
 
 async def _grant_course_access(
     db_session: AsyncSession, payment: IranKishPayment
 ) -> None:
-    """Add the buyer to the course's purchasers UserGroup (idempotent)."""
+    """Record the buyer's access for a settled payment.
+
+    The ``COMPLETED`` payment row itself is the entitlement (see
+    ``user_has_paid_course_access``), so there is nothing to insert for access.
+    We additionally enrol the buyer in the course so the purchase shows up as an
+    enrolment. Enrolment is best-effort: a failure to enrol must not undo a
+    settled payment, so it is logged and swallowed.
+    """
     course = (
         await db_session.execute(
             select(Course).where(Course.id == payment.course_id)
@@ -466,30 +422,15 @@ async def _grant_course_access(
         )
         return
 
-    group = await _get_or_create_purchasers_group(db_session, course)
-
-    existing = (
-        await db_session.execute(
-            select(UserGroupUser.id).where(
-                UserGroupUser.usergroup_id == group.id,
-                UserGroupUser.user_id == payment.user_id,
-            )
+    try:
+        await enrol_user_in_course(db_session, payment.user_id, course)
+    except Exception:
+        logger.exception(
+            "IranKish payment %s settled but enrolling the buyer in course %s "
+            "failed; the purchase still grants access via the payment ledger",
+            payment.payment_uuid,
+            payment.course_id,
         )
-    ).scalars().first()
-    if existing:
-        return
-
-    now = str(datetime.now())
-    db_session.add(
-        UserGroupUser(
-            usergroup_id=group.id,  # type: ignore[arg-type]
-            user_id=payment.user_id,
-            org_id=payment.org_id,
-            creation_date=now,
-            update_date=now,
-        )
-    )
-    await db_session.flush()
 
 
 # ---------------------------------------------------------------------------

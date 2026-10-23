@@ -1,22 +1,28 @@
 import logging
 from typing import Literal, Optional, Union
-from fastapi import HTTPException, status, Request
+
+from fastapi import HTTPException, Request, status
 from sqlalchemy import null
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+
 from src.db.courses.courses import Course
-from src.db.resource_authors import ResourceAuthor, ResourceAuthorshipEnum, ResourceAuthorshipStatusEnum
+from src.db.resource_authors import (
+    ResourceAuthor,
+    ResourceAuthorshipEnum,
+    ResourceAuthorshipStatusEnum,
+)
 from src.db.roles import Role
 from src.db.user_organizations import UserOrganization
-from src.db.users import APITokenUser
 from src.db.usergroup_resources import UserGroupResource
 from src.db.usergroup_user import UserGroupUser
+from src.db.users import APITokenUser
+from src.security.rbac.constants import ADMIN_OR_MAINTAINER_ROLE_IDS
 from src.security.rbac.utils import (
-    check_element_type,
     check_course_permissions_with_own,
+    check_element_type,
     get_element_organization_id,
 )
-from src.security.rbac.constants import ADMIN_OR_MAINTAINER_ROLE_IDS
 from src.security.superadmin import is_user_superadmin
 
 logger = logging.getLogger(__name__)
@@ -54,11 +60,19 @@ async def user_has_course_entitlement(
     Return True if the user already holds an entitlement to enroll in a
     purchasable course.
 
-    An entitlement is granted either by:
-      1. Membership in a UserGroup that is linked to the course (which is how a
-         completed purchase grants access — see payments_to_offers_migration),
-         or
-      2. A paid enrollment recognized by the optional payments ("ee") module.
+    Access-restriction (public vs. UserGroup) and purchase are independent
+    concerns, and this reflects that without chaining them:
+      1. Membership in a UserGroup the course is restricted to. Such a group is
+         the course's *access restriction*; its members have legitimate (free)
+         access and may enroll without buying.
+      2. A completed purchase recorded in the payment ledger (ZarinPal /
+         IranKish). The ledger — never UserGroup membership — is the source of
+         truth for "has paid".
+      3. A paid enrollment recognized by the optional payments ("ee") module.
+
+    Each path stands on its own: a purchase is honoured regardless of any group
+    restriction, and a group restriction is honoured regardless of payment. The
+    two never gate each other.
 
     Authors / admins / maintainers are NOT resolved here; they are granted
     earlier in the enrollment flow via the standard read-access check, so they
@@ -67,7 +81,7 @@ async def user_has_course_entitlement(
     if user_id == 0:
         return False
 
-    # 1. UserGroup membership linked to the course grants the entitlement.
+    # 1. Membership in a UserGroup the course is restricted to grants access.
     usergroup_stmt = select(UserGroupResource).where(
         UserGroupResource.resource_uuid == course_uuid
     )
@@ -83,7 +97,19 @@ async def user_has_course_entitlement(
         if membership is not None:
             return True
 
-    # 2. Paid enrollment recognized by the payments module (if installed).
+    # 2. A completed purchase in the payment ledger grants the entitlement.
+    course = (
+        await db_session.execute(
+            select(Course).where(Course.course_uuid == course_uuid)
+        )
+    ).scalars().first()
+    if course is not None:
+        from src.services.payments.pricing import user_has_paid_course_access
+
+        if await user_has_paid_course_access(db_session, user_id, course):
+            return True
+
+    # 3. Paid enrollment recognized by the payments module (if installed).
     try:
         from ee.services.payments.payments_access import check_enrollment_access
         if await check_enrollment_access(course_uuid, user_id, db_session):

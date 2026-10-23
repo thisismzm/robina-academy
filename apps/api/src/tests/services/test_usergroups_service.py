@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from sqlmodel import select
 
 from src.db.boards import Board
 from src.db.usergroup_resources import UserGroupResource
@@ -585,3 +586,74 @@ class TestUsergroupsService:
             with pytest.raises(HTTPException) as missing_group_exc:
                 await read_usergroup_by_id(mock_request, db, admin_user, 999)
         assert missing_group_exc.value.status_code == 404
+
+    async def _make_usergroup(self, db, org):
+        from src.db.usergroups import UserGroup
+
+        ug = UserGroup(
+            name="UG",
+            description="Desc",
+            org_id=org.id,
+            usergroup_uuid="usergroup_guard",
+            creation_date="2024-01-01",
+            update_date="2024-01-01",
+        )
+        db.add(ug)
+        await db.commit()
+        await db.refresh(ug)
+        return ug
+
+    @pytest.mark.asyncio
+    async def test_linking_usergroup_to_public_course_is_rejected(
+        self, mock_request, db, org, admin_user, course
+    ):
+        """A course is EITHER public OR restricted to a UserGroup, never both.
+        Linking a group to a public course must be refused (HTTP 400)."""
+        assert course.public is True  # fixture course is public
+        usergroup = await self._make_usergroup(db, org)
+
+        with patch(
+            "src.services.users.usergroups.rbac_check",
+            new_callable=AsyncMock,
+        ), patch(
+            "src.services.users.usergroups.dispatch_webhooks",
+            new_callable=AsyncMock,
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await add_resources_to_usergroup(
+                    mock_request, db, admin_user, usergroup.id, course.course_uuid
+                )
+        assert exc.value.status_code == 400
+
+        # No link row was created.
+        link = (
+            await db.execute(
+                select(UserGroupResource).where(
+                    UserGroupResource.resource_uuid == course.course_uuid
+                )
+            )
+        ).scalars().first()
+        assert link is None
+
+    @pytest.mark.asyncio
+    async def test_linking_usergroup_to_non_public_course_is_allowed(
+        self, mock_request, db, org, admin_user, course
+    ):
+        """A non-public course may be restricted to a UserGroup."""
+        course.public = False
+        db.add(course)
+        await db.commit()
+        await db.refresh(course)
+        usergroup = await self._make_usergroup(db, org)
+
+        with patch(
+            "src.services.users.usergroups.rbac_check",
+            new_callable=AsyncMock,
+        ), patch(
+            "src.services.users.usergroups.dispatch_webhooks",
+            new_callable=AsyncMock,
+        ):
+            result = await add_resources_to_usergroup(
+                mock_request, db, admin_user, usergroup.id, course.course_uuid
+            )
+        assert result == "Resources added to UserGroup successfully"

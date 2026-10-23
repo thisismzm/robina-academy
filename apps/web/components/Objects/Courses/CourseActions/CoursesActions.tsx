@@ -213,7 +213,6 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
         }
       }
     } catch (error) {
-      console.error('Failed to perform course action:', error)
       // 402 = this course is purchasable and the user has no entitlement yet.
       // Surface a purchase prompt instead of a generic error, and refresh the
       // linked-offers query so the buy UI renders.
@@ -227,6 +226,7 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
         }
         toast.error(t('courses.purchase_required'), { id: loadingToast })
       } else {
+        console.error('Failed to perform course action:', error)
         toast.error(
           isStarted
             ? t('courses.leave_course_error')

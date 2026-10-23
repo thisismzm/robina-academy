@@ -109,6 +109,40 @@ async def _validate_resource_exists_and_belongs_to_org(
     return True
 
 
+async def _reject_usergroup_link_on_public_course(
+    resource_uuid: str,
+    db_session: AsyncSession,
+) -> None:
+    """Reject linking a UserGroup to a course that is public.
+
+    Access-restriction is binary: a course is either public (anyone views) or
+    restricted to UserGroups (members only). Linking a group to a public course
+    would be a no-op at view time (the public flag wins), so the restriction
+    would silently not apply. Guard against that surprise by refusing the link;
+    the owner must make the course non-public first. Non-course resources are
+    unaffected.
+    """
+    config = get_resource_config(resource_uuid)
+    if not config or config.resource_type != "courses":
+        return
+
+    from src.db.courses.courses import Course
+
+    course = (
+        await db_session.execute(
+            select(Course).where(Course.course_uuid == resource_uuid)
+        )
+    ).scalars().first()
+    if course is not None and course.public:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This course is public and cannot be restricted to a UserGroup. "
+                "Make the course non-public first, then link the UserGroup."
+            ),
+        )
+
+
 async def create_usergroup(
     request: Request,
     db_session: AsyncSession,
@@ -714,6 +748,12 @@ async def add_resources_to_usergroup(
         await _validate_resource_exists_and_belongs_to_org(
             resource_uuid, usergroup.org_id, db_session
         )
+
+        # A course is EITHER public OR restricted to UserGroups, never both:
+        # restricting a public course to a group would be silently ignored at
+        # view time (public view wins), so the restriction would not take
+        # effect. Refuse the link; the course must be made non-public first.
+        await _reject_usergroup_link_on_public_course(resource_uuid, db_session)
 
         usergroup_obj = UserGroupResource(
             usergroup_id=usergroup_id,

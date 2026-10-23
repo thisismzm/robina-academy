@@ -397,6 +397,7 @@
     "start_course_success": "Kurs erfolgreich gestartet",
     "leave_course_error": "Fehler beim Verlassen des Kurses. Bitte versuchen Sie es später erneut.",
     "start_course_error": "Fehler beim Starten des Kurses. Bitte versuchen Sie es später erneut.",
+    "purchase_required": "Dieser Kurs muss gekauft werden, bevor Sie sich einschreiben können.",
     "you_own_this_course": "Sie besitzen diesen Kurs",
     "you_own_this_course_description": "Sie haben diesen Kurs gekauft und haben vollen Zugriff auf alle Inhalte.",
     "paid_course": "Kostenpflichtiger Kurs",
@@ -1611,6 +1612,10 @@
           "confirmation_title": "Zu Nur Benutzer wechseln?",
           "confirmation_message": "Sind Sie sicher, dass dieser Kurs nur für angemeldete Benutzer zugänglich sein soll?",
           "confirmation_button": "Zu Nur Benutzer wechseln"
+        },
+        "requires_purchase": {
+          "title": "Kauf zur Einschreibung erforderlich",
+          "description": "Jeder, der den Kurs ansehen kann, sieht die Vorschau, aber für die Einschreibung ist ein abgeschlossener Kauf erforderlich. Verknüpfe ein kostenpflichtiges Angebot oder lege einen Preis fest, damit Käufer zur Kasse gehen können."
         },
         "usergroups": {
           "title": "Benutzergruppen",

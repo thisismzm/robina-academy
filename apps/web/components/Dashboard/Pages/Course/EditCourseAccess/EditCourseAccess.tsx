@@ -26,10 +26,11 @@ type AccessCardProps = {
     title: string
     description: string
     selected: boolean
+    activeLabel: string
 } & React.HTMLAttributes<HTMLDivElement>
 
 const AccessCard = React.forwardRef<HTMLDivElement, AccessCardProps>(
-    function AccessCard({ icon: Icon, title, description, selected, className, ...rest }, ref) {
+    function AccessCard({ icon: Icon, title, description, selected, activeLabel, className, ...rest }, ref) {
         return (
             <div
                 ref={ref}
@@ -51,7 +52,7 @@ const AccessCard = React.forwardRef<HTMLDivElement, AccessCardProps>(
                         <span className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center">
                             <Check size={10} strokeWidth={3.5} className="text-white" />
                         </span>
-                        <span>Active</span>
+                        <span>{activeLabel}</span>
                     </div>
                 )}
 
@@ -204,6 +205,7 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
                                         icon={Globe}
                                         title={t('dashboard.courses.access.public.title')}
                                         description={t('dashboard.courses.access.public.description')}
+                                        activeLabel={t('dashboard.courses.access.public.active')}
                                         selected
                                     />
                                 ) : (
@@ -216,6 +218,7 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
                                                 icon={Globe}
                                                 title={t('dashboard.courses.access.public.title')}
                                                 description={t('dashboard.courses.access.public.description')}
+                                                activeLabel={t('dashboard.courses.access.public.active')}
                                                 selected={false}
                                             />
                                         }
@@ -230,6 +233,7 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
                                         icon={Users}
                                         title={t('dashboard.courses.access.users_only.title')}
                                         description={t('dashboard.courses.access.users_only.description')}
+                                        activeLabel={t('dashboard.courses.access.users_only.active')}
                                         selected
                                     />
                                 ) : (
@@ -242,6 +246,7 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
                                                 icon={Users}
                                                 title={t('dashboard.courses.access.users_only.title')}
                                                 description={t('dashboard.courses.access.users_only.description')}
+                                                activeLabel={t('dashboard.courses.access.users_only.active')}
                                                 selected={false}
                                             />
                                         }
@@ -283,7 +288,7 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
                         >
                             <span
                                 className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-150 ${
-                                    requiresPurchase ? 'translate-x-6' : 'translate-x-1'
+                                    requiresPurchase ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'
                                 }`}
                             />
                         </button>
@@ -382,7 +387,7 @@ function UserGroupsSection({ usergroups }: { usergroups: any[] }) {
                         <tbody className="divide-y divide-gray-50">
                             {usergroups.map((usergroup: any) => (
                                 <tr
-                                    key={usergroup.invite_code_uuid}
+                                    key={usergroup.id}
                                     className="hover:bg-gray-50 transition-colors"
                                 >
                                     <td className="px-6 py-4">

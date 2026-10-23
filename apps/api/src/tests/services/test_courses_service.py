@@ -31,11 +31,13 @@ from src.db.resource_authors import (
     ResourceAuthorshipEnum,
     ResourceAuthorshipStatusEnum,
 )
+from src.db.usergroup_resources import UserGroupResource
 from src.db.users import APITokenUser, AnonymousUser
 from src.security.rbac import AccessAction, AccessContext
 from src.services.courses.courses import (
     _strip_course_from_landing,
     clone_course,
+    course_has_linked_usergroups,
     create_course,
     delete_course,
     get_course,
@@ -850,6 +852,80 @@ class TestCourseMutationsAndRights:
         assert thumbnail_updated.thumbnail_video == "video.mp4"
         assert updated.name == "Updated Course"
         assert forbidden_exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_making_group_restricted_course_public_is_rejected(
+        self, db, org, course, admin_user, mock_request
+    ):
+        """A course is EITHER public OR restricted to a UserGroup, never both.
+        Turning a group-restricted course public must be refused (HTTP 400) so
+        the restriction is not silently overridden."""
+        # Start non-public and link a UserGroup (a restriction).
+        course.public = False
+        db.add(course)
+        await db.commit()
+        db.add(UserGroupResource(
+            usergroup_id=1,
+            resource_uuid=course.course_uuid,
+            org_id=org.id,
+            creation_date="2024-01-01",
+            update_date="2024-01-01",
+        ))
+        await db.commit()
+
+        assert await course_has_linked_usergroups(db, course.course_uuid) is True
+
+        with patch(
+            "src.services.courses.courses.check_resource_access",
+            new_callable=AsyncMock,
+        ), patch(
+            "src.services.courses.courses.authorization_verify_based_on_org_admin_status",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await update_course(
+                    mock_request,
+                    CourseUpdate(public=True),
+                    course.course_uuid,
+                    admin_user,
+                    db,
+                )
+        assert exc.value.status_code == 400
+
+        # The course stayed non-public.
+        refreshed = (
+            await db.execute(
+                select(Course).where(Course.course_uuid == course.course_uuid)
+            )
+        ).scalars().first()
+        assert refreshed.public is False
+
+    @pytest.mark.asyncio
+    async def test_making_unlinked_course_public_is_allowed(
+        self, db, org, course, admin_user, mock_request
+    ):
+        """A course with no linked UserGroup can be made public freely."""
+        course.public = False
+        db.add(course)
+        await db.commit()
+
+        with patch(
+            "src.services.courses.courses.check_resource_access",
+            new_callable=AsyncMock,
+        ), patch(
+            "src.services.courses.courses.authorization_verify_based_on_org_admin_status",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
+            updated = await update_course(
+                mock_request,
+                CourseUpdate(public=True),
+                course.course_uuid,
+                admin_user,
+                db,
+            )
+        assert updated.public is True
 
     @pytest.mark.asyncio
     async def test_update_course_open_to_contributors_owner_path(

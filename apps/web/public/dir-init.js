@@ -31,10 +31,12 @@
       if (qs) return qs;
     } catch { /* malformed query string */ }
 
-    return (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+    // Persian is the default: with no explicit choice (localStorage/cookie/
+    // querystring) we land on 'fa' rather than following the browser locale.
+    return 'fa';
   }
 
-  var code = String(detect() || 'en').split('-')[0].toLowerCase();
+  var code = String(detect() || 'fa').split('-')[0].toLowerCase();
   var dir = RTL[code] ? 'rtl' : 'ltr';
 
   var el = document.documentElement;

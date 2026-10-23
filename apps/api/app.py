@@ -73,9 +73,20 @@ class _SelectiveGZipResponder(GZipResponder):
     async def send_with_compression(self, message: Message) -> None:
         if message["type"] == "http.response.start":
             await super().send_with_compression(message)
-            if not self.content_type_is_excluded:
+            if not (
+                self.content_type_is_excluded
+                or self.content_encoding_set
+                or self.partial_response
+            ):
                 content_type = Headers(raw=message["headers"]).get("content-type", "")
-                self.content_type_is_excluded = not _is_compressible(content_type)
+                if not _is_compressible(content_type):
+                    # The base class held the start message back, expecting to
+                    # compress. Flipping to pass-through means the body branch
+                    # will forward chunks directly, so the start message must be
+                    # sent now; otherwise the body goes out with no start and the
+                    # server fails the request (e.g. a bare RedirectResponse).
+                    self.content_type_is_excluded = True
+                    await self.send(self.initial_message)
             return
         await super().send_with_compression(message)
 

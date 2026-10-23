@@ -398,6 +398,7 @@
     "start_course_success": "Úspešne ste začali kurz",
     "leave_course_error": "Nepodarilo sa opustiť kurz. Skúste to neskôr.",
     "start_course_error": "Nepodarilo sa začať kurz. Skúste to neskôr.",
+    "purchase_required": "Tento kurz je potrebné zakúpiť pred zápisom.",
     "you_own_this_course": "Vlastníte tento kurz",
     "you_own_this_course_description": "Zakúpili ste tento kurz a máte plný prístup ku všetkému obsahu.",
     "paid_course": "Platený kurz",
@@ -1871,6 +1872,10 @@
           "confirmation_title": "Zmeniť na len pre používateľov?",
           "confirmation_message": "Ste si istí, že chcete, aby bol tento kurz dostupný len pre prihlásených používateľov?",
           "confirmation_button": "Zmeniť na len pre používateľov"
+        },
+        "requires_purchase": {
+          "title": "Zápis vyžaduje nákup",
+          "description": "Každý, kto si môže kurz zobraziť, uvidí jeho ukážku, ale zápis vyžaduje dokončený nákup. Prepojte platenú ponuku alebo nastavte cenu, aby mohli kupujúci dokončiť platbu."
         },
         "usergroups": {
           "title": "Skupiny používateľov",

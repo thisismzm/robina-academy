@@ -869,6 +869,26 @@ async def update_course_thumbnail(
     return course
 
 
+async def course_has_linked_usergroups(
+    db_session: AsyncSession, course_uuid: str
+) -> bool:
+    """Whether the course is restricted to (linked to) any UserGroup.
+
+    A linked UserGroup makes the course viewable to members only; a course with
+    no linked group relies on its ``public`` flag for visibility. This is the
+    neutral, access-layer query used to keep "public" and "group-restricted"
+    mutually exclusive — it says nothing about payment.
+    """
+    row = (
+        await db_session.execute(
+            select(UserGroupResource.id).where(
+                UserGroupResource.resource_uuid == course_uuid
+            )
+        )
+    ).scalars().first()
+    return row is not None
+
+
 async def update_course(
     request: Request,
     course_object: CourseUpdate,
@@ -938,6 +958,22 @@ async def update_course(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You must be the course owner (CREATOR or MAINTAINER) or have admin role to change access settings: {', '.join(sensitive_fields_updated)}",
+            )
+
+    # A course is EITHER public (anyone may view) OR restricted to one or more
+    # UserGroups (only members may view) — never both. Making a course public
+    # while it still carries a UserGroup restriction would silently override
+    # that restriction (public view wins), leaking a restricted course to
+    # everyone. Refuse the change; the owner must unlink the group(s) first.
+    if course_object.public is True and not course.public:
+        if await course_has_linked_usergroups(db_session, course.course_uuid):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "This course is restricted to one or more UserGroups and "
+                    "cannot be made public. Remove the UserGroup restrictions "
+                    "first, then make it public."
+                ),
             )
 
     # SECURITY: thumbnail names end up in storage paths (clone copies them);

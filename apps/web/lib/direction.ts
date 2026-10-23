@@ -32,7 +32,7 @@ export const RTL_LANGUAGES = new Set([
 
 /** `en-GB` -> `en`. Mirrors the `.split('-')[0]` used throughout lib/i18n.ts. */
 export function baseCode(lng?: string | null): string {
-  return String(lng || 'en').split('-')[0].toLowerCase()
+  return String(lng || 'fa').split('-')[0].toLowerCase()
 }
 
 export function directionForLanguage(lng?: string | null): Direction {
@@ -46,8 +46,10 @@ export function dirMultiplier(dir: Direction): 1 | -1 {
 
 /**
  * Detect the language the same way i18next's LanguageDetector does, in the same
- * order (see `detection.order` in lib/i18n.ts). Client-only; returns 'en' on
- * the server.
+ * order (see `detection.order` in lib/i18n.ts): localStorage → cookie →
+ * querystring. With no explicit choice it resolves to Persian, the default
+ * language. Returns 'en' on the server only, to match the static `lang="en"`
+ * SSR baseline and keep hydration safe.
  *
  * Kept byte-for-byte equivalent to the detector in public/dir-init.js.
  */
@@ -77,7 +79,9 @@ export function detectClientLanguage(): string {
     /* malformed query string */
   }
 
-  return navigator.languages?.[0] || navigator.language || 'en'
+  // Persian is the default: with no explicit choice (localStorage/cookie/
+  // querystring) we land on 'fa' rather than following the browser locale.
+  return 'fa'
 }
 
 /**

@@ -419,6 +419,7 @@
     "start_course_success": "Berhasil memulai kursus",
     "leave_course_error": "Gagal meninggalkan kursus. Silakan coba lagi nanti.",
     "start_course_error": "Gagal memulai kursus. Silakan coba lagi nanti.",
+    "purchase_required": "Kursus ini harus dibeli sebelum Anda dapat mendaftar.",
     "you_own_this_course": "Anda Memiliki Kursus Ini",
     "you_own_this_course_description": "Anda telah membeli kursus ini dan memiliki akses penuh ke semua konten.",
     "paid_course": "Kursus Berbayar",
@@ -1633,6 +1634,10 @@
           "confirmation_title": "Ubah ke Hanya Pengguna?",
           "confirmation_message": "Apakah Anda yakin ingin kursus ini hanya dapat diakses oleh pengguna yang sudah masuk?",
           "confirmation_button": "Ubah ke Hanya Pengguna"
+        },
+        "requires_purchase": {
+          "title": "Memerlukan pembelian untuk mendaftar",
+          "description": "Siapa pun yang dapat melihat kursus akan melihat pratinjaunya, tetapi pendaftaran memerlukan pembelian yang selesai. Tautkan penawaran berbayar atau tetapkan harga agar pembeli dapat melakukan checkout."
         },
         "usergroups": {
           "title": "Grup Pengguna",

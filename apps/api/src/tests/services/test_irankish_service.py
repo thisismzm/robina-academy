@@ -2,10 +2,10 @@
 
 Covers: pricing a course, starting a checkout (token obtained, PENDING row
 created), a successful callback (confirm -> COMPLETED -> course access granted
-via UserGroup membership), and a failed callback (FAILED, no access). The remote
-gateway (token/confirm) and the digital-envelope crypto are mocked; the DB is
-the in-memory SQLite from conftest, so the UserGroup/UserGroupUser wiring is
-exercised for real.
+via the payment ledger plus a trail enrolment), and a failed callback (FAILED,
+no access). The remote gateway (token/confirm) and the digital-envelope crypto
+are mocked; the DB is the in-memory SQLite from conftest, so the ledger and
+enrolment wiring is exercised for real.
 """
 
 from types import SimpleNamespace
@@ -16,12 +16,12 @@ from fastapi import HTTPException
 from sqlmodel import select
 
 from src.db.irankish import IranKishPayment, IranKishPaymentStatusEnum
-from src.db.usergroup_resources import UserGroupResource
-from src.db.usergroup_user import UserGroupUser
+from src.db.trail_runs import TrailRun
 from src.services.payments.irankish import irankish as svc
 from src.services.payments.pricing import (
     COURSE_PRICE_METADATA_KEY,
     set_course_price,
+    user_has_paid_course_access,
 )
 
 
@@ -198,24 +198,19 @@ async def test_successful_callback_confirms_and_grants_access(
     assert payment.status == IranKishPaymentStatusEnum.COMPLETED
     assert payment.retrieval_reference_number == "123456789012"
 
-    # Access granted: a UserGroup holds the course and the buyer is a member.
-    ugr = (
+    # Access granted: the COMPLETED ledger row IS the entitlement (no UserGroup).
+    assert await user_has_paid_course_access(db, admin_user.id, course) is True
+
+    # And the buyer is enrolled: a TrailRun exists for them on this course.
+    run = (
         await db.execute(
-            select(UserGroupResource).where(
-                UserGroupResource.resource_uuid == course.course_uuid
+            select(TrailRun).where(
+                TrailRun.course_id == course.id,
+                TrailRun.user_id == admin_user.id,
             )
         )
     ).scalars().first()
-    assert ugr is not None
-    member = (
-        await db.execute(
-            select(UserGroupUser).where(
-                UserGroupUser.usergroup_id == ugr.usergroup_id,
-                UserGroupUser.user_id == admin_user.id,
-            )
-        )
-    ).scalars().first()
-    assert member is not None
+    assert run is not None
 
 
 async def test_failed_callback_marks_failed_and_grants_no_access(
@@ -227,12 +222,14 @@ async def test_failed_callback_marks_failed_and_grants_no_access(
     payment = await svc.handle_callback(mock_request, db, callback)
 
     assert payment.status == IranKishPaymentStatusEnum.FAILED
-    member = (
+    # No access: the ledger has no COMPLETED row and no enrolment was created.
+    assert await user_has_paid_course_access(db, admin_user.id, course) is False
+    run = (
         await db.execute(
-            select(UserGroupUser).where(UserGroupUser.user_id == admin_user.id)
+            select(TrailRun).where(TrailRun.user_id == admin_user.id)
         )
     ).scalars().first()
-    assert member is None
+    assert run is None
 
 
 async def test_callback_is_idempotent_on_completed(

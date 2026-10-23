@@ -34,7 +34,12 @@ from src.db.skyroom import (
 )
 from src.db.users import AnonymousUser, APITokenUser, PublicUser
 from src.security.auth import resolve_acting_user_id
-from src.security.org_auth import require_org_admin, require_org_role_permission
+from src.security.org_auth import (
+    is_org_admin,
+    require_org_admin,
+    require_org_membership,
+    require_org_role_permission,
+)
 from src.security.rbac.rbac import authorization_verify_if_user_is_anon
 from src.services.skyroom import client as skyroom_client
 from src.services.skyroom.client import (
@@ -218,11 +223,19 @@ async def list_live_classes(
 ) -> List[SkyroomLiveClassRead]:
     acting_user_id = resolve_acting_user_id(current_user)
     await authorization_verify_if_user_is_anon(acting_user_id)
-    await require_org_admin(acting_user_id, org_id, db_session)
+    # Members (students) need this list to resolve and join the live classes
+    # embedded in their lessons. Admins/maintainers get the full list for the
+    # org dashboard; non-admins only see active classes (see filter below).
+    await require_org_membership(acting_user_id, org_id, db_session)
+    is_admin = await is_org_admin(acting_user_id, org_id, db_session)
 
     statement = select(SkyroomLiveClass).where(SkyroomLiveClass.org_id == org_id)
     if course_id is not None:
         statement = statement.where(SkyroomLiveClass.course_id == course_id)
+    # Non-admins can only ever act on active classes, so never leak inactive
+    # ones to them (the authoring dashboard is admin-only and wants them all).
+    if not is_admin:
+        statement = statement.where(SkyroomLiveClass.is_active == True)  # noqa: E712
     rows = (await db_session.execute(statement)).scalars().all()
     return [_to_read(r) for r in rows]
 
@@ -472,21 +485,36 @@ async def create_join_link(
 ) -> SkyroomJoinLinkResponse:
     """Generate a direct, login-free join URL for a participant.
 
-    Admin/maintainer gated: issuing an operator (access=3) link hands control of
-    the room to the holder, so link creation is an admin action rather than a
-    member self-service one.
+    A presenter (access=2) or operator (access=3) link hands elevated control of
+    the room to the holder, so those remain admin/maintainer-gated. A plain
+    participant link (access=1) is member self-service: students need it to join
+    the live classes embedded in their lessons, but only while the class is
+    active.
     """
     acting_user_id = resolve_acting_user_id(current_user)
     await authorization_verify_if_user_is_anon(acting_user_id)
-    await require_org_admin(acting_user_id, org_id, db_session)
-
-    row = await _get_live_class_or_404(db_session, org_id, liveclass_uuid)
 
     if join_object.access not in (1, 2, 3):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="access must be 1 (user), 2 (presenter) or 3 (operator).",
         )
+
+    if join_object.access == 1:
+        await require_org_membership(acting_user_id, org_id, db_session)
+    else:
+        await require_org_admin(acting_user_id, org_id, db_session)
+
+    row = await _get_live_class_or_404(db_session, org_id, liveclass_uuid)
+
+    # Members may only join active classes; admins can mint links regardless so
+    # they can test a class before activating it.
+    if join_object.access == 1 and not row.is_active:
+        if not await is_org_admin(acting_user_id, org_id, db_session):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="This live class is not currently available.",
+            )
 
     # Default the opaque user_id to the acting user so the link is tied to one
     # identity (prevents unlimited concurrent reuse) when the caller omits it.

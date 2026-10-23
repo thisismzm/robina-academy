@@ -419,6 +419,7 @@
     "start_course_success": "Pomyślnie rozpoczęto kurs",
     "leave_course_error": "Nie udało się opuścić kursu. Spróbuj ponownie później.",
     "start_course_error": "Nie udało się rozpocząć kursu. Spróbuj ponownie później.",
+    "purchase_required": "Ten kurs wymaga zakupu przed zapisaniem się.",
     "you_own_this_course": "Posiadasz ten kurs",
     "you_own_this_course_description": "Zakupiłeś ten kurs i masz pełny dostęp do wszystkich treści.",
     "paid_course": "Płatny kurs",
@@ -1633,6 +1634,10 @@
           "confirmation_title": "Zmienić na Tylko dla użytkowników?",
           "confirmation_message": "Czy na pewno chcesz, aby ten kurs był dostępny tylko dla zalogowanych użytkowników?",
           "confirmation_button": "Zmień na Tylko dla użytkowników"
+        },
+        "requires_purchase": {
+          "title": "Zapis wymaga zakupu",
+          "description": "Każdy, kto może zobaczyć kurs, widzi jego podgląd, ale zapis wymaga ukończonego zakupu. Połącz płatną ofertę lub ustaw cenę, aby kupujący mogli sfinalizować płatność."
         },
         "usergroups": {
           "title": "Grupy użytkowników",

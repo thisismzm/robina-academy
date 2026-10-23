@@ -397,6 +397,7 @@
     "start_course_success": "Cursus succesvol gestart",
     "leave_course_error": "Kon de cursus niet verlaten. Probeer het later opnieuw.",
     "start_course_error": "Kon de cursus niet starten. Probeer het later opnieuw.",
+    "purchase_required": "Deze cursus moet worden gekocht voordat je je kunt inschrijven.",
     "you_own_this_course": "Je Bezit Deze Cursus",
     "you_own_this_course_description": "Je hebt deze cursus gekocht en hebt volledige toegang tot alle inhoud.",
     "paid_course": "Betaalde cursus",
@@ -1611,6 +1612,10 @@
           "confirmation_title": "Wijzigen naar Alleen Gebruikers?",
           "confirmation_message": "Weet je zeker dat je deze cursus alleen toegankelijk wilt maken voor ingelogde gebruikers?",
           "confirmation_button": "Wijzigen naar Alleen Gebruikers"
+        },
+        "requires_purchase": {
+          "title": "Aankoop vereist om in te schrijven",
+          "description": "Iedereen die de cursus kan bekijken ziet de preview, maar voor inschrijving is een voltooide aankoop vereist. Koppel een betaald aanbod of stel een prijs in zodat kopers kunnen afrekenen."
         },
         "usergroups": {
           "title": "Gebruikersgroepen",

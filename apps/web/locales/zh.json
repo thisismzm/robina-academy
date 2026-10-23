@@ -407,6 +407,7 @@
     "start_course_success": "课程开始成功",
     "leave_course_error": "退出课程失败，请稍后重试。",
     "start_course_error": "开始课程失败，请稍后重试。",
+    "purchase_required": "报名此课程前需要先购买。",
     "you_own_this_course": "您拥有此课程",
     "you_own_this_course_description": "您已购买此课程，可以完全访问所有内容。",
     "paid_course": "付费课程",
@@ -1621,6 +1622,10 @@
           "confirmation_title": "设为仅限用户？",
           "confirmation_message": "您确定要将此课程设为仅对注册用户开放吗？",
           "confirmation_button": "仅限用户"
+        },
+        "requires_purchase": {
+          "title": "报名需要购买",
+          "description": "任何能够查看课程的人都能看到预览，但报名需要完成购买。请关联一个付费优惠或设置价格，以便买家结账。"
         },
         "usergroups": {
           "title": "用户组",

@@ -397,6 +397,7 @@
     "start_course_success": "Cours commencé avec succès",
     "leave_course_error": "Erreur lors de la sortie du cours",
     "start_course_error": "Erreur lors du lancement du cours",
+    "purchase_required": "Ce cours doit être acheté avant de pouvoir vous inscrire.",
     "you_own_this_course": "Cours possédé",
     "you_own_this_course_description": "Vous avez un accès complet à ce contenu.",
     "paid_course": "Cours payant",
@@ -1622,6 +1623,10 @@
           "confirmation_title": "Passer aux utilisateurs uniquement ?",
           "confirmation_message": "Êtes-vous sûr de vouloir que ce cours ne soit accessible qu'aux utilisateurs connectés ?",
           "confirmation_button": "Passer aux utilisateurs uniquement"
+        },
+        "requires_purchase": {
+          "title": "Achat requis pour s'inscrire",
+          "description": "Toute personne pouvant voir le cours en voit l'aperçu, mais l'inscription nécessite un achat finalisé. Liez une offre payante ou définissez un prix pour que les acheteurs puissent passer à la caisse."
         },
         "usergroups": {
           "title": "Groupes d'utilisateurs",

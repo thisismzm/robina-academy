@@ -407,6 +407,7 @@
     "start_course_success": "성공적으로 코스를 시작했습니다",
     "leave_course_error": "코스 나가기 실패. 나중에 다시 시도해 주세요.",
     "start_course_error": "코스 시작 실패. 나중에 다시 시도해 주세요.",
+    "purchase_required": "이 코스에 등록하려면 먼저 구매해야 합니다.",
     "you_own_this_course": "이 코스를 소유하고 있습니다",
     "you_own_this_course_description": "이 코스를 구매하셨으며 모든 콘텐츠에 대한 전체 권한이 있습니다.",
     "paid_course": "유료 코스",
@@ -1621,6 +1622,10 @@
           "confirmation_title": "사용자 전용으로 변경하시겠습니까?",
           "confirmation_message": "정말로 이 코스를 로그인한 사용자만 액세스할 수 있게 하시겠습니까?",
           "confirmation_button": "사용자 전용으로 변경"
+        },
+        "requires_purchase": {
+          "title": "등록하려면 구매가 필요합니다",
+          "description": "코스를 볼 수 있는 사람은 누구나 미리보기를 볼 수 있지만, 등록하려면 구매를 완료해야 합니다. 유료 혜택을 연결하거나 가격을 설정하여 구매자가 결제할 수 있도록 하세요."
         },
         "usergroups": {
           "title": "사용자 그룹",

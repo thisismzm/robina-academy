@@ -61,14 +61,18 @@ i18n
     // I18nProvider's effect). The detector plugin stays registered so its
     // caches (localStorage + cookie) keep working for changeLanguage().
     lng: 'en',
-    fallbackLng: 'en',
+    fallbackLng: 'fa',
     ns: ['common'],
     defaultNS: 'common',
     interpolation: {
       escapeValue: false, // react already safes from xss
     },
     detection: {
-      order: ['localStorage', 'cookie', 'querystring', 'navigator', 'path', 'subdomain'],
+      // Persian is the default language: only explicit user choices
+      // (localStorage/cookie/querystring) are honoured. 'navigator' and the
+      // other auto sources are intentionally omitted so a fresh visitor lands
+      // on 'fa' (via fallbackLng) rather than following their browser locale.
+      order: ['localStorage', 'cookie', 'querystring'],
       caches: ['localStorage', 'cookie'],
       lookupLocalStorage: 'i18nextLng',
       lookupCookie: 'i18next',
@@ -94,9 +98,10 @@ export async function changeLanguage(lng: string) {
  * this is what then moves the UI to the detected locale.
  *
  * Runs the exact same detection LanguageDetector would have (localStorage →
- * cookie → querystring → navigator), preloads the bundle + dayjs locale, then
- * switches. No-op on the server and when the detected language is already
- * English, so hydration is never disturbed.
+ * cookie → querystring), preloads the bundle + dayjs locale, then switches.
+ * With no explicit choice this resolves to Persian, the default language.
+ * No-op on the server and when the detected language already matches the
+ * current one, so hydration is never disturbed.
  */
 export async function applyDetectedLanguage(): Promise<void> {
   if (typeof window === 'undefined') return
@@ -105,7 +110,7 @@ export async function applyDetectedLanguage(): Promise<void> {
     | string[]
     | undefined)
   const lng = Array.isArray(detected) ? detected[0] : detected
-  const code = (lng || 'en').split('-')[0]
+  const code = (lng || 'fa').split('-')[0]
   if (!code || code === i18n.language.split('-')[0]) return
   await changeLanguage(lng || code)
 }

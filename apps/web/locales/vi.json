@@ -419,6 +419,7 @@
     "start_course_success": "Đã bắt đầu khóa học thành công",
     "leave_course_error": "Không thể rời khóa học. Vui lòng thử lại sau.",
     "start_course_error": "Không thể bắt đầu khóa học. Vui lòng thử lại sau.",
+    "purchase_required": "Bạn cần mua khóa học này trước khi đăng ký.",
     "you_own_this_course": "Bạn Đã Sở Hữu Khóa Học Này",
     "you_own_this_course_description": "Bạn đã mua khóa học này và có quyền truy cập đầy đủ vào tất cả nội dung.",
     "paid_course": "Khóa học trả phí",
@@ -1633,6 +1634,10 @@
           "confirmation_title": "Chuyển sang chỉ dành cho người dùng?",
           "confirmation_message": "Bạn có chắc chắn muốn giới hạn khóa học này chỉ dành cho những người dùng đã đăng ký không?",
           "confirmation_button": "Chuyển sang chỉ người dùng"
+        },
+        "requires_purchase": {
+          "title": "Cần mua để ghi danh",
+          "description": "Bất kỳ ai có thể xem khóa học đều thấy bản xem trước, nhưng để ghi danh cần hoàn tất việc mua. Liên kết một ưu đãi trả phí hoặc đặt giá để người mua có thể thanh toán."
         },
         "usergroups": {
           "title": "Nhóm người dùng",
