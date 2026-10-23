@@ -12,7 +12,9 @@ RUN apk upgrade --no-cache \
 RUN python -m pip uninstall --yes pip \
     && rm -rf /usr/local/lib/python3.14/ensurepip
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.7 /uv /uvx /bin/
+# Docker Hub mirror of ghcr.io/astral-sh/uv (same digest); ghcr.io is not
+# reachable from every build host.
+COPY --from=astral/uv:0.10.7 /uv /uvx /bin/
 
 # UV_COMPILE_BYTECODE bakes .pyc into the image. Without it every container start
 # recompiles ~2200 modules from source, which measured at 17s of the API's cold start.

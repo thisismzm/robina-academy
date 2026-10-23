@@ -94,7 +94,9 @@ RUN python -m pip uninstall --yes pip \
     && rm -rf /usr/local/lib/python3.14/ensurepip
 
 COPY --from=frontend-deps /usr/local/bin/bun /usr/local/bin/bun
-COPY --from=ghcr.io/astral-sh/uv:0.10.7 /uv /uvx /bin/
+# Docker Hub mirror of ghcr.io/astral-sh/uv (same digest); ghcr.io is not
+# reachable from every build host.
+COPY --from=astral/uv:0.10.7 /uv /uvx /bin/
 
 # Copy the frontend standalone build
 COPY --from=frontend-runner /app /app/web
