@@ -98,6 +98,7 @@ async def api_get_trail_by_org_id(
     responses={
         200: {"description": "Course added to trail.", "model": TrailRead},
         401: {"description": "Authentication required"},
+        402: {"description": "Course requires a purchase before enrollment"},
         403: {"description": "User does not have access to this course"},
         404: {"description": "Course or trail not found"},
     },

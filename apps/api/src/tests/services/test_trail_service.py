@@ -533,3 +533,130 @@ class TestTrailService:
 
         assert len(result.runs) == 1
         assert len(result.runs[0].steps) == 1
+
+
+class TestPurchasableCourseEnrollment:
+    """Enrollment gate for courses flagged requires_purchase=True.
+
+    A purchasable course stays viewable (public + published), but enrolling
+    requires either course ownership/management or a completed entitlement.
+    """
+
+    async def _make_purchasable_course(self, db, org, *, id, course_uuid, name):
+        course = Course(
+            id=id,
+            name=name,
+            description=f"Description for {name}",
+            public=True,
+            published=True,
+            open_to_contributors=False,
+            requires_purchase=True,
+            org_id=org.id,
+            course_uuid=course_uuid,
+            creation_date=str(datetime.now()),
+            update_date=str(datetime.now()),
+        )
+        db.add(course)
+        await db.commit()
+        await db.refresh(course)
+        return course
+
+    @pytest.mark.asyncio
+    async def test_regular_user_without_entitlement_gets_402(
+        self, db, org, regular_user, mock_request
+    ):
+        """A viewer who is neither owner nor entitled is blocked with 402."""
+        await _make_trail(db, org, regular_user)
+        course = await self._make_purchasable_course(
+            db, org, id=50, course_uuid="course_paid", name="Paid Course"
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            await add_course_to_trail(
+                mock_request, regular_user, course.course_uuid, db
+            )
+
+        assert exc.value.status_code == 402
+        assert exc.value.detail["code"] == "PAYMENT_REQUIRED"
+        assert exc.value.detail["course_uuid"] == course.course_uuid
+
+        # No enrollment row should have been created.
+        runs = (await db.execute(
+            TrailRun.__table__.select().where(TrailRun.course_id == course.id)
+        )).all()
+        assert runs == []
+
+    @pytest.mark.asyncio
+    async def test_owner_admin_bypasses_paywall(
+        self, db, org, admin_user, mock_request
+    ):
+        """A course owner/admin can enroll in their own purchasable course."""
+        await _make_trail(db, org, admin_user)
+        course = await self._make_purchasable_course(
+            db, org, id=51, course_uuid="course_paid_admin", name="Paid Course Admin"
+        )
+
+        with patch(
+            "src.services.trail.trail.track", new_callable=AsyncMock
+        ), patch(
+            "src.services.trail.trail.dispatch_webhooks", new_callable=AsyncMock
+        ):
+            result = await add_course_to_trail(
+                mock_request, admin_user, course.course_uuid, db
+            )
+
+        assert any(r.course["course_uuid"] == course.course_uuid for r in result.runs)
+
+    @pytest.mark.asyncio
+    async def test_user_with_usergroup_entitlement_can_enroll(
+        self, db, org, regular_user, mock_request
+    ):
+        """A user who holds the course's entitlement (UserGroup membership,
+        i.e. a completed purchase) can enroll."""
+        from src.db.usergroups import UserGroup
+        from src.db.usergroup_resources import UserGroupResource
+        from src.db.usergroup_user import UserGroupUser
+
+        await _make_trail(db, org, regular_user)
+        course = await self._make_purchasable_course(
+            db, org, id=52, course_uuid="course_paid_entitled", name="Paid Course Entitled"
+        )
+
+        ug = UserGroup(
+            name="Offer group",
+            description="Backs the paid offer",
+            org_id=org.id,
+            usergroup_uuid="usergroup_paid",
+            creation_date=str(datetime.now()),
+            update_date=str(datetime.now()),
+        )
+        db.add(ug)
+        await db.commit()
+        await db.refresh(ug)
+
+        db.add(UserGroupResource(
+            usergroup_id=ug.id,
+            resource_uuid=course.course_uuid,
+            org_id=org.id,
+            creation_date=str(datetime.now()),
+            update_date=str(datetime.now()),
+        ))
+        db.add(UserGroupUser(
+            usergroup_id=ug.id,
+            user_id=regular_user.id,
+            org_id=org.id,
+            creation_date=str(datetime.now()),
+            update_date=str(datetime.now()),
+        ))
+        await db.commit()
+
+        with patch(
+            "src.services.trail.trail.track", new_callable=AsyncMock
+        ), patch(
+            "src.services.trail.trail.dispatch_webhooks", new_callable=AsyncMock
+        ):
+            result = await add_course_to_trail(
+                mock_request, regular_user, course.course_uuid, db
+            )
+
+        assert any(r.course["course_uuid"] == course.course_uuid for r in result.runs)

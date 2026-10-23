@@ -195,12 +195,26 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
       }
     } catch (error) {
       console.error('Failed to perform course action:', error)
-      toast.error(
-        isStarted
-          ? t('courses.leave_course_error')
-          : t('courses.start_course_error'),
-        { id: loadingToast }
-      )
+      // 402 = this course is purchasable and the user has no entitlement yet.
+      // Surface a purchase prompt instead of a generic error, and refresh the
+      // linked-offers query so the buy UI renders.
+      if ((error as any)?.status === 402) {
+        track(AnalyticsEvent.CourseSignupPrompted, {
+          reason: 'purchase_required',
+          intended_action: 'start_course',
+        })
+        if (org?.id) {
+          queryClient.invalidateQueries({ queryKey: ['offers', 'by-resource', org.id, resourceUuid] })
+        }
+        toast.error(t('courses.purchase_required'), { id: loadingToast })
+      } else {
+        toast.error(
+          isStarted
+            ? t('courses.leave_course_error')
+            : t('courses.start_course_error'),
+          { id: loadingToast }
+        )
+      }
     } finally {
       setIsActionLoading(false)
     }

@@ -432,6 +432,7 @@
     "start_course_success": "Successfully started the course",
     "leave_course_error": "Failed to leave the course. Please try again later.",
     "start_course_error": "Failed to start the course. Please try again later.",
+    "purchase_required": "This course requires a purchase before you can enroll.",
     "you_own_this_course": "You Own This Course",
     "you_own_this_course_description": "You have purchased this course and have full access to all content.",
     "paid_course": "Paid Course",
@@ -2249,6 +2250,10 @@
           "confirmation_title": "Change to Users Only?",
           "confirmation_message": "Are you sure you want this course to be only accessible to signed in users?",
           "confirmation_button": "Change to Users Only"
+        },
+        "requires_purchase": {
+          "title": "Requires purchase to enroll",
+          "description": "Anyone who can view the course sees its preview, but enrolling requires a completed purchase. Link a paid offer or set a price so buyers can check out."
         },
         "usergroups": {
           "title": "UserGroups",
