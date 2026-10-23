@@ -597,7 +597,7 @@ class TestSendInviteEmailLangLookup:
                 mock_request,
             )
 
-        assert mock_send.call_args.kwargs["lang"] == "en"
+        assert mock_send.call_args.kwargs["lang"] == "fa"
 
 
 class TestSendInviteEmailExceptionBranch:
@@ -631,7 +631,7 @@ class TestSendInviteEmailExceptionBranch:
             )
 
         assert result is True
-        assert mock_send.call_args.kwargs["lang"] == "en"
+        assert mock_send.call_args.kwargs["lang"] == "fa"
 
 
 class TestGetRedis:

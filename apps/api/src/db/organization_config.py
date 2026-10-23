@@ -224,7 +224,7 @@ class GeneralCustomization(BaseModel):
     square_logo_image: str = ""
     watermark: bool = True
     font: str = ""
-    default_language: str = "en"
+    default_language: str = "fa"
     # Display name on transactional email from this org. The From ADDRESS is
     # never configurable (it stays the platform's verified sending domain, so
     # DKIM keeps aligning), only the name a recipient sees. Empty means "use

@@ -167,7 +167,7 @@ class TestResolveOrgEmailBranding:
     def test_defaults_without_a_config_row(self):
         with patch("src.services.email.utils.get_media_base_url", return_value=""):
             branding = resolve_org_email_branding(self._org(logo_image=None), None)
-        assert branding == OrgEmailBranding(org_name="Acme & Co")
+        assert branding == OrgEmailBranding(org_name="Acme & Co", lang="fa")
 
     def test_as_kwargs_matches_the_send_function_parameters(self):
         import inspect

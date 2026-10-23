@@ -104,7 +104,7 @@ const OrgEditGeneral: React.FC = () => {
   const [defaultLanguage, setDefaultLanguage] = React.useState<string>(
     org?.config?.config?.customization?.general?.default_language ||
     org?.config?.config?.general?.default_language ||
-    'en'
+    'fa'
   )
 
   const initialValues: OrganizationValues = {

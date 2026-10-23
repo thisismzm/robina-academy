@@ -44,7 +44,7 @@ class TestSnapshotShape:
         assert snap.member_count == 0
         assert snap.admins == ()
         assert snap.plan == "free"
-        assert snap.lang == "en"
+        assert snap.lang == "fa"
 
     async def test_course_counts_and_flags(self, db, org, course):
         snap = await _snapshot(db, org)

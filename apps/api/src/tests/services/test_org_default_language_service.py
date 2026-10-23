@@ -154,21 +154,21 @@ class TestGetOrgDefaultLanguage:
         assert get_org_default_language(row) == "es"
 
     @pytest.mark.asyncio
-    async def test_returns_en_when_key_absent(self, db, org):
+    async def test_returns_fa_when_key_absent(self, db, org):
         row = await _make_org_config(
             db,
             org,
             {"config_version": "2.0", "customization": {"general": {}}},
         )
-        assert get_org_default_language(row) == "en"
+        assert get_org_default_language(row) == "fa"
 
-    def test_returns_en_when_org_config_is_none(self):
-        assert get_org_default_language(None) == "en"
+    def test_returns_fa_when_org_config_is_none(self):
+        assert get_org_default_language(None) == "fa"
 
     @pytest.mark.asyncio
-    async def test_returns_en_when_config_is_empty(self, db, org):
+    async def test_returns_fa_when_config_is_empty(self, db, org):
         row = await _make_org_config(db, org, {})
-        assert get_org_default_language(row) == "en"
+        assert get_org_default_language(row) == "fa"
 
 
 class TestApiUpdateOrgDefaultLanguageRouterWrapper:
