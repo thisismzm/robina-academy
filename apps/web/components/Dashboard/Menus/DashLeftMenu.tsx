@@ -7,6 +7,7 @@ import {
   Files,
   Users,
   CurrencyCircleDollar,
+  Tag,
   Buildings,
   Globe,
   Question,
@@ -612,6 +613,13 @@ function DashLeftMenu() {
               />
             )}
 
+            <MenuLink
+              href="/dash/discounts/codes"
+              icon={<Tag size={20} weight="fill" />}
+              label={t('common.discounts')}
+              isCollapsed={isCollapsed}
+              active={isActivePath('/dash/discounts')}
+            />
             {/* Organization with hover menu */}
             <HoverMenu
               content={

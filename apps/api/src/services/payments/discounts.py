@@ -28,11 +28,14 @@ from src.db.discount_codes import (
     DiscountCode,
     DiscountCodeCreate,
     DiscountCodeRead,
+    DiscountCodeStats,
     DiscountCodeUpdate,
+    DiscountRedemption,
+    DiscountReport,
 )
 from src.db.irankish import IranKishPayment, IranKishPaymentStatusEnum
 from src.db.organizations import Organization
-from src.db.users import AnonymousUser, APITokenUser, PublicUser
+from src.db.users import AnonymousUser, APITokenUser, PublicUser, User
 from src.db.zarinpal import ZarinPalPayment, ZarinPalPaymentStatusEnum
 from src.security.auth import resolve_acting_user_id
 from src.security.org_auth import require_org_role_permission
@@ -200,6 +203,7 @@ def _to_read(code: DiscountCode) -> DiscountCodeRead:
         org_id=code.org_id,
         course_id=code.course_id,
         code=code.code,
+        description=code.description,
         percent_off=code.percent_off,
         amount_off=code.amount_off,
         max_redemptions=code.max_redemptions,
@@ -259,6 +263,13 @@ async def create_discount_code(
             detail="Provide exactly one of percent_off or amount_off.",
         )
 
+    description = (data.description or "").strip()
+    if not description:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A description is required.",
+        )
+
     code_str = normalize_code(data.code)
     if len(code_str) < 3:
         raise HTTPException(
@@ -285,6 +296,7 @@ async def create_discount_code(
         org_id=org_id,
         course_id=data.course_id,
         code=code_str,
+        description=description,
         percent_off=data.percent_off,
         amount_off=data.amount_off,
         max_redemptions=data.max_redemptions,
@@ -336,6 +348,14 @@ async def update_discount_code(
     await _admin_gate(db_session, org_id, current_user)
     code = await _get_code_or_404(db_session, org_id, code_id)
 
+    if data.description is not None:
+        description = data.description.strip()
+        if not description:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A description is required.",
+            )
+        code.description = description
     if data.is_active is not None:
         code.is_active = data.is_active
     if data.single_use_per_user is not None:
@@ -369,3 +389,169 @@ async def delete_discount_code(
     await db_session.delete(code)
     await db_session.commit()
     return {"deleted": True, "id": code_id}
+
+
+# ---------------------------------------------------------------------------
+# Usage report
+# ---------------------------------------------------------------------------
+
+_PAYMENT_MODELS = (
+    ("zarinpal", ZarinPalPayment, ZarinPalPaymentStatusEnum),
+    ("irankish", IranKishPayment, IranKishPaymentStatusEnum),
+)
+
+
+async def get_discount_report(
+    request: Request,
+    db_session: AsyncSession,
+    org_id: int,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+) -> DiscountReport:
+    """Per-code usage, computed from COMPLETED payments in both gateway ledgers."""
+    await _admin_gate(db_session, org_id, current_user)
+
+    codes = (
+        await db_session.execute(
+            select(DiscountCode)
+            .where(DiscountCode.org_id == org_id)
+            .order_by(DiscountCode.id.desc())  # type: ignore[union-attr]
+        )
+    ).scalars().all()
+
+    acc: dict[int, dict] = {
+        c.id: {  # type: ignore[misc]
+            "redemptions": 0,
+            "buyers": set(),
+            "original": 0,
+            "discount": 0,
+            "revenue": 0,
+            "incomplete": 0,
+        }
+        for c in codes
+    }
+
+    for _gateway, model, status_enum in _PAYMENT_MODELS:
+        rows = (
+            await db_session.execute(
+                select(
+                    model.discount_code_id,
+                    model.user_id,
+                    model.amount,
+                    model.original_amount,
+                    model.discount_amount,
+                    model.status,
+                ).where(
+                    model.org_id == org_id,
+                    model.discount_code_id.is_not(None),  # type: ignore[union-attr]
+                )
+            )
+        ).all()
+        for code_id, user_id, amount, original, discount, pay_status in rows:
+            bucket = acc.get(code_id)
+            if bucket is None:
+                continue
+            if pay_status == status_enum.COMPLETED:
+                bucket["redemptions"] += 1
+                bucket["buyers"].add(user_id)
+                bucket["original"] += original or 0
+                bucket["discount"] += discount or 0
+                bucket["revenue"] += amount or 0
+            else:
+                bucket["incomplete"] += 1
+
+    stats = [
+        DiscountCodeStats(
+            code_id=c.id,  # type: ignore[arg-type]
+            code=c.code,
+            description=c.description,
+            course_id=c.course_id,
+            is_active=c.is_active,
+            max_redemptions=c.max_redemptions,
+            expires_at=c.expires_at,
+            redemptions=acc[c.id]["redemptions"],  # type: ignore[index]
+            unique_buyers=len(acc[c.id]["buyers"]),  # type: ignore[index]
+            original_total=acc[c.id]["original"],  # type: ignore[index]
+            discount_total=acc[c.id]["discount"],  # type: ignore[index]
+            revenue_total=acc[c.id]["revenue"],  # type: ignore[index]
+            incomplete_attempts=acc[c.id]["incomplete"],  # type: ignore[index]
+        )
+        for c in codes
+    ]
+    return DiscountReport(
+        redemptions=sum(s.redemptions for s in stats),
+        discount_total=sum(s.discount_total for s in stats),
+        revenue_total=sum(s.revenue_total for s in stats),
+        original_total=sum(s.original_total for s in stats),
+        codes=stats,
+    )
+
+
+async def list_redemptions(
+    request: Request,
+    db_session: AsyncSession,
+    org_id: int,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    code_id: Optional[int] = None,
+    include_incomplete: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[DiscountRedemption]:
+    """Payments that used a discount code, newest first.
+
+    Only COMPLETED payments unless ``include_incomplete`` is set. Payments of a
+    deleted code are not listed (their code link is cleared on delete).
+    """
+    await _admin_gate(db_session, org_id, current_user)
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+
+    code_names = {
+        c.id: c.code
+        for c in (
+            await db_session.execute(
+                select(DiscountCode).where(DiscountCode.org_id == org_id)
+            )
+        ).scalars().all()
+    }
+
+    merged: list[DiscountRedemption] = []
+    for gateway, model, status_enum in _PAYMENT_MODELS:
+        stmt = (
+            select(model, User, Course.name)
+            .join(User, User.id == model.user_id)  # type: ignore[arg-type]
+            .join(Course, Course.id == model.course_id)  # type: ignore[arg-type]
+            .where(
+                model.org_id == org_id,
+                model.discount_code_id.is_not(None),  # type: ignore[union-attr]
+            )
+            .order_by(model.id.desc())  # type: ignore[union-attr]
+            .limit(limit + offset)
+        )
+        if code_id is not None:
+            stmt = stmt.where(model.discount_code_id == code_id)
+        if not include_incomplete:
+            stmt = stmt.where(model.status == status_enum.COMPLETED)
+        for payment, user, course_name in (await db_session.execute(stmt)).all():
+            merged.append(
+                DiscountRedemption(
+                    payment_uuid=payment.payment_uuid,
+                    gateway=gateway,
+                    status=payment.status.value,
+                    code_id=payment.discount_code_id,
+                    code=code_names.get(payment.discount_code_id),
+                    user_id=payment.user_id,
+                    username=user.username,
+                    email=user.email,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    course_id=payment.course_id,
+                    course_name=course_name,
+                    original_amount=payment.original_amount,
+                    discount_amount=payment.discount_amount,
+                    amount=payment.amount,
+                    date=payment.update_date or payment.creation_date,
+                )
+            )
+
+    merged.sort(key=lambda r: r.date, reverse=True)
+    return merged[offset : offset + limit]

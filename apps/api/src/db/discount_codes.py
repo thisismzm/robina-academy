@@ -51,6 +51,12 @@ class DiscountCode(SQLModel, table=True):
     # Stored upper-cased and trimmed; matched case-insensitively.
     code: str = Field(sa_column=Column(String(64), nullable=False))
 
+    # Admin-facing note on what the code is for (campaign, partner, ...).
+    description: str = Field(
+        default="",
+        sa_column=Column(String(500), nullable=False, server_default=""),
+    )
+
     # Exactly one of these is set.
     percent_off: Optional[int] = Field(default=None, sa_column=Column(Integer))
     amount_off: Optional[int] = Field(default=None, sa_column=Column(Integer))
@@ -87,6 +93,7 @@ class DiscountCode(SQLModel, table=True):
 
 class DiscountCodeCreate(BaseModel):
     code: str = PydanticField(min_length=3, max_length=64)
+    description: str = PydanticField(min_length=1, max_length=500)
     course_id: Optional[int] = None
     percent_off: Optional[int] = PydanticField(default=None, ge=1, le=99)
     amount_off: Optional[int] = PydanticField(default=None, ge=1)
@@ -96,6 +103,7 @@ class DiscountCodeCreate(BaseModel):
 
 
 class DiscountCodeUpdate(BaseModel):
+    description: Optional[str] = PydanticField(default=None, min_length=1, max_length=500)
     is_active: Optional[bool] = None
     single_use_per_user: Optional[bool] = None
     max_redemptions: Optional[int] = PydanticField(default=None, ge=1)
@@ -110,6 +118,7 @@ class DiscountCodeRead(BaseModel):
     org_id: int
     course_id: Optional[int] = None
     code: str
+    description: str = ""
     percent_off: Optional[int] = None
     amount_off: Optional[int] = None
     max_redemptions: Optional[int] = None
@@ -132,3 +141,54 @@ class DiscountValidateResponse(BaseModel):
     discount_amount: Optional[int] = None
     final_amount: Optional[int] = None
     detail: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Usage report schemas
+# ---------------------------------------------------------------------------
+
+
+class DiscountCodeStats(BaseModel):
+    """Usage of one code, derived from the payment ledger (completed payments)."""
+
+    code_id: int
+    code: str
+    description: str = ""
+    course_id: Optional[int] = None
+    is_active: bool
+    max_redemptions: Optional[int] = None
+    expires_at: Optional[str] = None
+    redemptions: int
+    unique_buyers: int
+    original_total: int  # sum of pre-discount prices
+    discount_total: int  # sum of discounts given
+    revenue_total: int  # sum actually charged
+    # Checkout attempts that used the code but did not complete (pending/failed).
+    incomplete_attempts: int
+
+
+class DiscountReport(BaseModel):
+    redemptions: int
+    discount_total: int
+    revenue_total: int
+    original_total: int
+    codes: list[DiscountCodeStats]
+
+
+class DiscountRedemption(BaseModel):
+    payment_uuid: str
+    gateway: str
+    status: str
+    code_id: Optional[int] = None
+    code: Optional[str] = None
+    user_id: int
+    username: Optional[str] = None
+    email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    course_id: int
+    course_name: Optional[str] = None
+    original_amount: Optional[int] = None
+    discount_amount: Optional[int] = None
+    amount: int
+    date: str

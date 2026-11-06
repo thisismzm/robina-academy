@@ -12,6 +12,7 @@ import {
   Headphones,
   ChartBar,
   Code,
+  Tag,
 } from '@phosphor-icons/react'
 
 export interface DashboardMenuItem {
@@ -93,6 +94,12 @@ export const DASHBOARD_MENU_ITEMS: DashboardMenuItem[] = [
     icon: CurrencyCircleDollar,
     labelKey: 'common.payments',
     featureKey: 'payments',
+  },
+  {
+    id: 'discounts',
+    href: '/dash/discounts/codes',
+    icon: Tag,
+    labelKey: 'common.discounts',
   },
   {
     id: 'organization',
