@@ -64,6 +64,7 @@ from src.db.zarinpal import (
 from src.security.auth import resolve_acting_user_id
 from src.security.org_auth import require_org_role_permission
 from src.security.rbac.rbac import authorization_verify_if_user_is_anon
+from src.services.payments.discounts import record_redemption, resolve_discount
 from src.services.payments.pricing import (
     enrol_user_in_course,
     read_course_price,
@@ -171,6 +172,7 @@ async def create_checkout(
     course_id: int,
     callback_url: str,
     current_user: PublicUser | AnonymousUser | APITokenUser,
+    discount_code: Optional[str] = None,
 ) -> dict:
     """Start a purchase: request a payment and return the redirect URL.
 
@@ -209,6 +211,21 @@ async def create_checkout(
             detail="You already have access to this course.",
         )
 
+    # Apply an optional discount code. ``price`` becomes the amount actually
+    # charged at the gateway; the original price is kept on the payment row.
+    original_price = price
+    resolved = None
+    if discount_code and discount_code.strip():
+        resolved = await resolve_discount(
+            db_session,
+            org_id=org_id,
+            course=course,
+            price=price,
+            raw_code=discount_code,
+            user_id=acting_user_id,
+        )
+        price = resolved.final_amount
+
     # Persist a PENDING row before calling the gateway so a successful request
     # whose response is lost can still be reconciled. The authority is filled in
     # once ZarinPal returns it.
@@ -219,6 +236,9 @@ async def create_checkout(
         user_id=acting_user_id,
         course_id=course_id,
         amount=price,
+        discount_code_id=resolved.discount.id if resolved else None,
+        original_amount=original_price if resolved else None,
+        discount_amount=resolved.discount_amount if resolved else None,
         status=ZarinPalPaymentStatusEnum.PENDING,
         creation_date=now,
         update_date=now,
@@ -253,6 +273,8 @@ async def create_checkout(
         "payment_url": zarinpal_client.get_start_pay_url(authority),
         "authority": authority,
         "amount": price,
+        "original_amount": original_price if resolved else None,
+        "discount_amount": resolved.discount_amount if resolved else None,
     }
 
 
@@ -361,6 +383,7 @@ async def handle_callback(
     # the buyer sees is diagnosable, and re-raise rather than silently swallow.
     try:
         await _grant_course_access(db_session, payment)
+        await record_redemption(db_session, payment.discount_code_id)
         payment.status = ZarinPalPaymentStatusEnum.COMPLETED
         payment.update_date = str(datetime.now())
         db_session.add(payment)
@@ -441,6 +464,9 @@ def to_read(payment: ZarinPalPayment) -> ZarinPalPaymentRead:
         user_id=payment.user_id,
         course_id=payment.course_id,
         amount=payment.amount,
+        discount_code_id=payment.discount_code_id,
+        original_amount=payment.original_amount,
+        discount_amount=payment.discount_amount,
         authority=payment.authority,
         ref_id=payment.ref_id,
         card_pan=payment.card_pan,

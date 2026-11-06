@@ -44,11 +44,12 @@ export async function setCourseIranKishPrice(
 export async function startIranKishCheckout(
   orgId: number,
   courseId: number,
-  access_token: string
+  access_token: string,
+  discountCode?: string | null
 ) {
   const result = await secureFetch(
     `${getAPIUrl()}payments/irankish/${encodeURIComponent(String(orgId))}/courses/${encodeURIComponent(String(courseId))}/checkout`,
-    RequestBodyWithAuthHeader('POST', { course_id: courseId }, null, access_token)
+    RequestBodyWithAuthHeader('POST', { course_id: courseId, discount_code: discountCode || null }, null, access_token)
   );
   const res = await errorHandling(result);
   return res;

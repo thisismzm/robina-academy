@@ -36,6 +36,9 @@ from sqlalchemy import (
 )
 from sqlmodel import Field, SQLModel
 
+# Imported so the discount_code table is registered before the payment FK to it.
+from src.db.discount_codes import DiscountCode  # noqa: F401
+
 
 class ZarinPalPaymentStatusEnum(str, Enum):
     PENDING = "PENDING"
@@ -96,6 +99,17 @@ class ZarinPalPayment(SQLModel, table=True):
     # (100 = success, 101 = already verified, other = failure).
     code: Optional[int] = Field(default=None, sa_column=Column(Integer))
 
+    # Discount-code bookkeeping. ``amount`` above is the FINAL (discounted)
+    # amount charged at the gateway; these record how it was derived. All NULL
+    # when no code was used. The code FK is SET NULL so deleting a code keeps
+    # the payment history.
+    discount_code_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("discount_code.id", ondelete="SET NULL")),
+    )
+    original_amount: Optional[int] = Field(default=None, sa_column=Column(Integer))
+    discount_amount: Optional[int] = Field(default=None, sa_column=Column(Integer))
+
     status: ZarinPalPaymentStatusEnum = Field(
         default=ZarinPalPaymentStatusEnum.PENDING,
         sa_column=Column(
@@ -117,6 +131,8 @@ class ZarinPalCheckoutCreate(BaseModel):
     """Start a purchase of ``course_id`` for the amount configured for it."""
 
     course_id: int
+    # Optional discount code to apply to the price.
+    discount_code: Optional[str] = None
 
 
 class ZarinPalCheckoutResponse(BaseModel):
@@ -130,6 +146,8 @@ class ZarinPalCheckoutResponse(BaseModel):
     payment_url: str
     authority: str
     amount: int
+    original_amount: Optional[int] = None
+    discount_amount: Optional[int] = None
 
 
 class ZarinPalPaymentRead(BaseModel):
@@ -143,6 +161,9 @@ class ZarinPalPaymentRead(BaseModel):
     ref_id: Optional[str] = None
     card_pan: Optional[str] = None
     code: Optional[int] = None
+    discount_code_id: Optional[int] = None
+    original_amount: Optional[int] = None
+    discount_amount: Optional[int] = None
     status: ZarinPalPaymentStatusEnum
     creation_date: str
     update_date: str

@@ -32,6 +32,9 @@ from sqlalchemy import (
 )
 from sqlmodel import Field, SQLModel
 
+# Imported so the discount_code table is registered before the payment FK to it.
+from src.db.discount_codes import DiscountCode  # noqa: F401
+
 
 class IranKishPaymentStatusEnum(str, Enum):
     PENDING = "PENDING"
@@ -95,6 +98,17 @@ class IranKishPayment(SQLModel, table=True):
     # The raw ISO-8583 response code from the callback / confirmation, for audit.
     response_code: Optional[str] = Field(default=None, sa_column=Column(String(4)))
 
+    # Discount-code bookkeeping. ``amount`` above is the FINAL (discounted)
+    # amount charged at the gateway; these record how it was derived. All NULL
+    # when no code was used. The code FK is SET NULL so deleting a code keeps
+    # the payment history.
+    discount_code_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("discount_code.id", ondelete="SET NULL")),
+    )
+    original_amount: Optional[int] = Field(default=None, sa_column=Column(Integer))
+    discount_amount: Optional[int] = Field(default=None, sa_column=Column(Integer))
+
     status: IranKishPaymentStatusEnum = Field(
         default=IranKishPaymentStatusEnum.PENDING,
         sa_column=Column(
@@ -116,6 +130,8 @@ class IranKishCheckoutCreate(BaseModel):
     """Start a purchase of ``course_id`` for the amount configured for it."""
 
     course_id: int
+    # Optional discount code to apply to the price.
+    discount_code: Optional[str] = None
 
 
 class IranKishCheckoutResponse(BaseModel):
@@ -129,6 +145,8 @@ class IranKishCheckoutResponse(BaseModel):
     payment_url: str
     form_fields: dict
     amount: int
+    original_amount: Optional[int] = None
+    discount_amount: Optional[int] = None
 
 
 class IranKishPaymentRead(BaseModel):
@@ -144,6 +162,9 @@ class IranKishPaymentRead(BaseModel):
     system_trace_audit_number: Optional[str] = None
     masked_pan: Optional[str] = None
     response_code: Optional[str] = None
+    discount_code_id: Optional[int] = None
+    original_amount: Optional[int] = None
+    discount_amount: Optional[int] = None
     status: IranKishPaymentStatusEnum
     creation_date: str
     update_date: str
