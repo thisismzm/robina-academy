@@ -35,7 +35,7 @@ def patch_ik():
 
 
 async def _mk(db, mock_request, org, admin_user, **kw):
-    data = DiscountCodeCreate(code=kw.pop("code", "Spring10"), **kw)
+    data = DiscountCodeCreate(code=kw.pop("code", "Spring10"), description=kw.pop("description", "Spring campaign"), **kw)
     return await dsvc.create_discount_code(mock_request, db, org.id, data, admin_user)
 
 
@@ -205,3 +205,47 @@ async def test_reusable_code_allows_same_buyer_again(db, org, admin_user, regula
         await dsvc.resolve_discount(db, raw_code="ONCE", **kw)
     r = await dsvc.resolve_discount(db, raw_code="MANY", **kw)
     assert r.final_amount == 900
+
+
+async def test_description_is_required_and_updatable(db, org, admin_user, mock_request):
+    with pytest.raises(HTTPException) as ei:
+        await _mk(db, mock_request, org, admin_user, code="NODESC", percent_off=10, description="   ")
+    assert ei.value.status_code == 400
+
+    created = await _mk(db, mock_request, org, admin_user, percent_off=10, description="Partner X")
+    assert created.description == "Partner X"
+    updated = await dsvc.update_discount_code(
+        mock_request, db, org.id, created.id, DiscountCodeUpdate(description=" New note "), admin_user
+    )
+    assert updated.description == "New note"
+
+
+async def test_report_and_redemptions_reflect_completed_payments(
+    db, org, admin_user, regular_user, course, mock_request
+):
+    used = await _mk(db, mock_request, org, admin_user, code="USED", percent_off=10)
+    idle = await _mk(db, mock_request, org, admin_user, code="IDLE", percent_off=10)
+    for i, st in enumerate((IranKishPaymentStatusEnum.COMPLETED, IranKishPaymentStatusEnum.FAILED)):
+        db.add(IranKishPayment(
+            payment_uuid=f"ikpay_{i}", org_id=org.id, user_id=regular_user.id,
+            course_id=course.id, amount=900, original_amount=1000, discount_amount=100,
+            request_id=f"r{i}", discount_code_id=used.id, status=st,
+            creation_date="2026-01-01", update_date=f"2026-01-0{i + 1}",
+        ))
+    await db.commit()
+
+    report = await dsvc.get_discount_report(mock_request, db, org.id, admin_user)
+    by_code = {c.code: c for c in report.codes}
+    assert (by_code["USED"].redemptions, by_code["USED"].incomplete_attempts) == (1, 1)
+    assert (by_code["USED"].discount_total, by_code["USED"].revenue_total) == (100, 900)
+    assert by_code["USED"].unique_buyers == 1
+    assert by_code["IDLE"].redemptions == 0
+    assert (report.redemptions, report.discount_total) == (1, 100)
+
+    rows = await dsvc.list_redemptions(mock_request, db, org.id, admin_user)
+    assert [r.payment_uuid for r in rows] == ["ikpay_0"]
+    assert rows[0].code == "USED" and rows[0].email == regular_user.email
+    rows = await dsvc.list_redemptions(mock_request, db, org.id, admin_user, include_incomplete=True)
+    assert len(rows) == 2
+    rows = await dsvc.list_redemptions(mock_request, db, org.id, admin_user, code_id=idle.id)
+    assert rows == []

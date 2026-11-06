@@ -35,6 +35,7 @@ export async function listDiscountCodes(orgId: number, access_token: string) {
 
 export interface CreateDiscountCodeInput {
   code: string;
+  description: string;
   course_id?: number | null;
   percent_off?: number | null;
   amount_off?: number | null;
@@ -79,6 +80,33 @@ export async function deleteDiscountCode(
   const result = await secureFetch(
     `${base(orgId)}/${encodeURIComponent(String(codeId))}`,
     RequestBodyWithAuthHeader('DELETE', null, null, access_token)
+  );
+  return errorHandling(result);
+}
+
+/** Admin: per-code usage totals (completed payments). */
+export async function getDiscountReport(orgId: number, access_token: string) {
+  const result = await secureFetch(
+    `${base(orgId)}/report`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  );
+  return errorHandling(result);
+}
+
+/** Admin: payments that used a code, newest first. */
+export async function listDiscountRedemptions(
+  orgId: number,
+  access_token: string,
+  opts: { codeId?: number | null; includeIncomplete?: boolean; limit?: number; offset?: number } = {}
+) {
+  const qs = new URLSearchParams();
+  if (opts.codeId) qs.set('code_id', String(opts.codeId));
+  if (opts.includeIncomplete) qs.set('include_incomplete', 'true');
+  qs.set('limit', String(opts.limit ?? 50));
+  qs.set('offset', String(opts.offset ?? 0));
+  const result = await secureFetch(
+    `${base(orgId)}/redemptions?${qs.toString()}`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
   );
   return errorHandling(result);
 }

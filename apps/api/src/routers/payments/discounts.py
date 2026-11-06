@@ -6,13 +6,17 @@ Mounted in ``src/router.py`` under ``/payments/discounts`` so the full paths are
 
 Endpoints:
   GET    /{org_id}                                   admin: list codes
+  GET    /{org_id}/report                            admin: per-code usage totals
+  GET    /{org_id}/redemptions                       admin: payments that used a code
   POST   /{org_id}                                   admin: create a code
   PUT    /{org_id}/{code_id}                         admin: activate / limit a code
   DELETE /{org_id}/{code_id}                         admin: delete a code
   POST   /{org_id}/courses/{course_id}/validate      buyer: preview a discounted price
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -22,6 +26,8 @@ from src.db.discount_codes import (
     DiscountCodeCreate,
     DiscountCodeRead,
     DiscountCodeUpdate,
+    DiscountRedemption,
+    DiscountReport,
     DiscountValidateRequest,
     DiscountValidateResponse,
 )
@@ -31,7 +37,9 @@ from src.security.rbac.rbac import authorization_verify_if_user_is_anon
 from src.services.payments.discounts import (
     create_discount_code,
     delete_discount_code,
+    get_discount_report,
     list_discount_codes,
+    list_redemptions,
     resolve_discount,
     update_discount_code,
 )
@@ -48,6 +56,38 @@ async def api_list_discount_codes(
     db_session: AsyncSession = Depends(get_db_session),
 ) -> list[DiscountCodeRead]:
     return await list_discount_codes(request, db_session, org_id, current_user)
+
+
+@router.get("/{org_id}/report", response_model=DiscountReport, summary="Discount code usage report")
+async def api_discount_report(
+    request: Request,
+    org_id: int,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> DiscountReport:
+    return await get_discount_report(request, db_session, org_id, current_user)
+
+
+@router.get(
+    "/{org_id}/redemptions",
+    response_model=list[DiscountRedemption],
+    summary="Payments that used a discount code",
+)
+async def api_discount_redemptions(
+    request: Request,
+    org_id: int,
+    code_id: Optional[int] = None,
+    include_incomplete: bool = False,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: PublicUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> list[DiscountRedemption]:
+    return await list_redemptions(
+        request, db_session, org_id, current_user,
+        code_id=code_id, include_incomplete=include_incomplete,
+        limit=limit, offset=offset,
+    )
 
 
 @router.post("/{org_id}", response_model=DiscountCodeRead, summary="Create a discount code")
