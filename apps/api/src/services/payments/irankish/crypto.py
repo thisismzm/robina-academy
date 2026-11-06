@@ -31,7 +31,7 @@ import hashlib
 import os
 from dataclasses import dataclass
 
-from cryptography.hazmat.primitives import padding, serialization
+from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.serialization import load_pem_public_key

@@ -10,7 +10,7 @@ flows, and user course listing.
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from src.core.events.database import get_db_session
@@ -331,11 +331,15 @@ class TestAuthorizationAndCreationEndpoints:
         assert response.json()["username"] == "invited"
         create_mock.assert_awaited_once()
 
-    async def test_create_user_with_invite_rejects_open_org(self, client):
+    async def test_create_user_with_invite_rejects_invalid_code(self, client):
+        # Open orgs accept an optional invite code, but an invalid one is
+        # still rejected by the service.
         with patch(
-            "src.routers.users.get_org_join_mechanism",
+            "src.routers.users.create_user_with_invite",
             new_callable=AsyncMock,
-            return_value="open",
+            side_effect=HTTPException(
+                status_code=400, detail="Invite code is incorrect"
+            ),
         ):
             response = await client.post(
                 "/api/v1/users/1/invite/code123",
@@ -348,7 +352,7 @@ class TestAuthorizationAndCreationEndpoints:
                 },
             )
 
-        assert response.status_code == 403
+        assert response.status_code == 400
         assert "invite code" in response.json()["detail"].lower()
 
 

@@ -23,7 +23,7 @@ The redirect to the payment page itself is a browser-driven HTML form POST to
 """
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 import httpx
 

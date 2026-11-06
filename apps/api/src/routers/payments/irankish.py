@@ -18,7 +18,7 @@ the cardholder's browser, not an authenticated API client.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -37,7 +37,6 @@ from src.services.payments.irankish.irankish import (
     create_checkout,
     get_payment,
     handle_callback,
-    to_read,
 )
 
 logger = logging.getLogger(__name__)
