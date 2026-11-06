@@ -14,7 +14,7 @@ below, because the gateways reject zero-amount payments.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
