@@ -113,7 +113,13 @@ async def api_create_checkout(
     # Build it from the incoming request so the backend host is not hard-coded.
     callback_url = str(request.url_for("api_zarinpal_callback"))
     result = await create_checkout(
-        request, db_session, org_id, course_id, callback_url, current_user
+        request,
+        db_session,
+        org_id,
+        course_id,
+        callback_url,
+        current_user,
+        discount_code=_body.discount_code if _body else None,
     )
     return ZarinPalCheckoutResponse(**result)
 
