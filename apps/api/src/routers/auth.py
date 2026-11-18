@@ -767,6 +767,8 @@ async def third_party_login(
     # Usergroup to attach the user to after sign-in, when they joined through an
     # invite code that is linked to one (mirrors create_user_with_invite).
     _invite_usergroup_id = None
+    # Invite code data to record in the usage stats once the user has joined.
+    _used_invite_code_data = None
     # Pending email invite to mark as consumed once the user actually joins.
     _consume_invite_key = None
 
@@ -860,6 +862,9 @@ async def third_party_login(
                 if _code_data:
                     _authorized = True
                     _invite_usergroup_id = _code_data.get("usergroup_id")
+                    # Existing members signing in again aren't new signups.
+                    if not _existing_member:
+                        _used_invite_code_data = _code_data
 
             # 2. Or a pending invite sent to this address from the org dashboard.
             if not _authorized:
@@ -928,6 +933,12 @@ async def third_party_login(
     # Neither of these ran on the OAuth path before, so a user invited by email
     # stayed "pending" in the org's member list after joining, and an invite code
     # carrying a usergroup silently didn't apply it.
+    if _used_invite_code_data and user.id is not None and org_id:
+        from src.services.orgs.invites import record_invite_code_usage
+
+        await record_invite_code_usage(
+            db_session, org_id, user.id, _used_invite_code_data
+        )
     if _invite_usergroup_id and user.id is not None:
         from src.db.users import InternalUser
         from src.services.users.usergroups import add_users_to_usergroup

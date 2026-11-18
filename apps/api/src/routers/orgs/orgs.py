@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, Request, UploadFile, Query, Path, HTTPEx
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.services.orgs.invites import (
     create_invite_code,
+    get_invite_code_stats,
+    get_invite_code_usage_users,
     delete_invite_code,
     get_invite_code,
     get_invite_codes,
@@ -1168,6 +1170,50 @@ async def api_create_invite_code(
     """
     return await create_invite_code(
         request, org_id, current_user, db_session, usergroup_id, code
+    )
+
+
+@router.get(
+    "/{org_id}/invites/stats",
+    summary="Invite code usage statistics",
+    description="Per-code signup counts, last-used time and a daily signup time series for the organization.",
+    responses={
+        200: {"description": "Invite code statistics."},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Caller is not an organization administrator"},
+        404: {"description": "Organization not found"},
+    },
+)
+async def api_get_invite_code_stats(
+    request: Request,
+    org_id: int,
+    days: int = Query(30, ge=1, le=365),
+    current_user: PublicUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    return await get_invite_code_stats(request, org_id, current_user, db_session, days)
+
+
+@router.get(
+    "/{org_id}/invites/usage/{invite_code_uuid}",
+    summary="Users who joined with an invite code",
+    description="List the users who signed up with one invite code.",
+    responses={
+        200: {"description": "Users for this code."},
+        401: {"description": "Not authenticated"},
+        403: {"description": "Caller is not an organization administrator"},
+        404: {"description": "Organization not found"},
+    },
+)
+async def api_get_invite_code_usage_users(
+    request: Request,
+    org_id: int,
+    invite_code_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    return await get_invite_code_usage_users(
+        request, org_id, invite_code_uuid, current_user, db_session
     )
 
 

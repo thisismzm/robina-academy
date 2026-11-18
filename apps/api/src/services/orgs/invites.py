@@ -4,16 +4,18 @@ import re
 import secrets
 import string
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import redis
 from fastapi import HTTPException, Request
 from pydantic import EmailStr
+from sqlalchemy import func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config.config import get_learnhouse_config
+from src.db.invite_code_usage import InviteCodeUsage
 from src.db.organization_config import OrganizationConfig
 from src.db.organizations import Organization, OrganizationRead
 from src.db.usergroups import UserGroup
@@ -462,3 +464,198 @@ async def send_invite_email(
     except Exception:
         logger.exception("Failed to send invite email to %s", email)
         return False
+
+
+async def record_invite_code_usage(
+    db_session: AsyncSession,
+    org_id: int,
+    user_id: int,
+    invite_code_data: dict,
+) -> None:
+    """Remember which invite code a user joined with.
+
+    Never raises: stats are secondary, and a failure here must not undo a
+    signup that already succeeded. Idempotent per (org, user).
+    """
+    try:
+        existing = (
+            await db_session.execute(
+                select(InviteCodeUsage.id).where(
+                    InviteCodeUsage.org_id == org_id,
+                    InviteCodeUsage.user_id == user_id,
+                )
+            )
+        ).first()
+        if existing:
+            return
+        usergroup_id = invite_code_data.get("usergroup_id")
+        db_session.add(
+            InviteCodeUsage(
+                org_id=org_id,
+                user_id=user_id,
+                invite_code_uuid=str(invite_code_data.get("invite_code_uuid", "")),
+                code=str(invite_code_data.get("invite_code", "")),
+                usergroup_id=int(usergroup_id) if usergroup_id else None,
+            )
+        )
+        await db_session.commit()
+    except Exception:
+        await db_session.rollback()
+        logger.warning("Could not record invite code usage", exc_info=True)
+
+
+async def get_invite_code_stats(
+    request: Request,
+    org_id: int,
+    current_user: PublicUser | AnonymousUser,
+    db_session: AsyncSession,
+    days: int = 30,
+):
+    """Per-code signup statistics for an organization (admin only)."""
+    days = max(1, min(days, 365))
+
+    # Same permission as listing the codes; also returns the live codes.
+    live_codes = await get_invite_codes(request, org_id, current_user, db_session)
+    live_by_uuid = {c["invite_code_uuid"]: c for c in live_codes}
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    per_code_rows = (
+        await db_session.execute(
+            select(
+                InviteCodeUsage.invite_code_uuid,
+                func.max(InviteCodeUsage.code),
+                func.count(InviteCodeUsage.id),
+                func.max(InviteCodeUsage.signed_up_at),
+                func.count(InviteCodeUsage.id).filter(InviteCodeUsage.signed_up_at >= since),
+            )
+            .where(InviteCodeUsage.org_id == org_id)
+            .group_by(InviteCodeUsage.invite_code_uuid)
+        )
+    ).all()
+    usage_by_uuid = {row[0]: row for row in per_code_rows}
+
+    codes = []
+    for code_uuid, live in live_by_uuid.items():
+        row = usage_by_uuid.get(code_uuid)
+        codes.append(
+            {
+                "invite_code_uuid": code_uuid,
+                "code": live.get("invite_code"),
+                "status": "active",
+                "usergroup_id": live.get("usergroup_id"),
+                "usergroup_name": live.get("usergroup_name"),
+                "created_at": live.get("created_at"),
+                "total_signups": row[2] if row else 0,
+                "signups_in_period": row[4] if row else 0,
+                "last_used": row[3].isoformat() if row and row[3] else None,
+            }
+        )
+    # Codes that were deleted or expired but still have recorded signups.
+    for code_uuid, row in usage_by_uuid.items():
+        if code_uuid in live_by_uuid:
+            continue
+        codes.append(
+            {
+                "invite_code_uuid": code_uuid,
+                "code": row[1],
+                "status": "deleted",
+                "usergroup_id": None,
+                "usergroup_name": None,
+                "created_at": None,
+                "total_signups": row[2],
+                "signups_in_period": row[4],
+                "last_used": row[3].isoformat() if row[3] else None,
+            }
+        )
+    codes.sort(key=lambda c: (c["total_signups"], c["code"] or ""), reverse=True)
+
+    # Bucket by day in Python (portable across databases); rows are bounded by
+    # the requested window.
+    series_rows = (
+        await db_session.execute(
+            select(InviteCodeUsage.signed_up_at, InviteCodeUsage.invite_code_uuid)
+            .where(
+                InviteCodeUsage.org_id == org_id,
+                InviteCodeUsage.signed_up_at >= since,
+            )
+            .order_by(InviteCodeUsage.signed_up_at)  # type: ignore[arg-type]
+        )
+    ).all()
+    timeseries: dict[str, dict] = {}
+    for signed_up_at, code_uuid in series_rows:
+        key = signed_up_at.date().isoformat()
+        entry = timeseries.setdefault(key, {"date": key, "total": 0, "by_code": {}})
+        entry["total"] += 1
+        entry["by_code"][code_uuid] = entry["by_code"].get(code_uuid, 0) + 1
+
+    # Members who joined in the same window, to compare invite vs. other joins.
+    from src.db.user_organizations import UserOrganization
+
+    # creation_date is stored as str(datetime.now()), so compare as text.
+    cutoff = str(datetime.now() - timedelta(days=days))
+    new_members = (
+        await db_session.execute(
+            select(func.count(UserOrganization.id)).where(
+                UserOrganization.org_id == org_id,
+                UserOrganization.creation_date >= cutoff,
+            )
+        )
+    ).scalar() or 0
+    via_invite = sum(c["signups_in_period"] for c in codes)
+
+    return {
+        "period_days": days,
+        "summary": {
+            "signups_via_invite": via_invite,
+            "new_members": max(new_members, via_invite),
+            "active_codes": len(live_by_uuid),
+            "total_signups_all_time": sum(c["total_signups"] for c in codes),
+        },
+        "codes": codes,
+        "timeseries": list(timeseries.values()),
+    }
+
+
+async def get_invite_code_usage_users(
+    request: Request,
+    org_id: int,
+    invite_code_uuid: str,
+    current_user: PublicUser | AnonymousUser,
+    db_session: AsyncSession,
+    limit: int = 100,
+):
+    """Users who joined with one invite code (admin only)."""
+    from src.db.users import User
+
+    statement = select(Organization).where(Organization.id == org_id)
+    org = (await db_session.execute(statement)).scalars().first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    await rbac_check(request, org.org_uuid, current_user, "update", db_session)
+
+    limit = max(1, min(limit, 500))
+    rows = (
+        await db_session.execute(
+            select(InviteCodeUsage, User)
+            .join(User, User.id == InviteCodeUsage.user_id)  # type: ignore[arg-type]
+            .where(
+                InviteCodeUsage.org_id == org_id,
+                InviteCodeUsage.invite_code_uuid == invite_code_uuid,
+            )
+            .order_by(InviteCodeUsage.signed_up_at.desc())  # type: ignore[attr-defined]
+            .limit(limit)
+        )
+    ).all()
+    return [
+        {
+            "user_uuid": user.user_uuid,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "signed_up_at": usage.signed_up_at.isoformat(),
+            "usergroup_id": usage.usergroup_id,
+        }
+        for usage, user in rows
+    ]

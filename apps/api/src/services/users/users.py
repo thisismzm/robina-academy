@@ -377,6 +377,12 @@ async def create_user_with_invite(
 
     user = await create_user(request, db_session, current_user, user_object, org_id, signup_provider="invite")
 
+    # Remember which code was used, for the invite code stats dashboard.
+    from src.services.orgs.invites import record_invite_code_usage
+
+    if user.id is not None:
+        await record_invite_code_usage(db_session, org_id, user.id, inviteCode)
+
     # Check if invite code contains UserGroup
     if inviteCode.get("usergroup_id"): # type: ignore
         # Add user to UserGroup
