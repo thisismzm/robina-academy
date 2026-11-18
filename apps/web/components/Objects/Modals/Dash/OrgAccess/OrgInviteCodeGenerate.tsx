@@ -24,6 +24,7 @@ function OrgInviteCodeGenerate(props: OrgInviteCodeGenerateProps) {
     const queryClient = useQueryClient()
     const [mode, setMode] = React.useState<'normal' | 'usergroup'>('normal');
     const [usergroup_id, setUsergroup_id] = React.useState(0);
+    const [customCode, setCustomCode] = React.useState('');
     const { track } = useLHAnalytics('dashboard')
 
     const { data: usergroups } = useQuery({
@@ -36,7 +37,12 @@ function OrgInviteCodeGenerate(props: OrgInviteCodeGenerateProps) {
 
     async function handleGenerate() {
         const ugId = mode === 'usergroup' && usergroup_id ? usergroup_id : undefined
-        let res = await createInviteCode(org.id, session.data?.tokens?.access_token, ugId)
+        const code = customCode.trim()
+        if (code && !/^[A-Za-z0-9]{4,32}$/.test(code)) {
+            toast.error('Invite code must be 4-32 letters or numbers')
+            return
+        }
+        let res = await createInviteCode(org.id, session.data?.tokens?.access_token, ugId, code || undefined)
         if (res.status == 200) {
             track(AnalyticsEvent.InviteCodeCreated, { mode, usergroup_id: ugId })
             queryClient.invalidateQueries({ queryKey: queryKeys.org.inviteCodes(org.id) })
@@ -130,6 +136,22 @@ function OrgInviteCodeGenerate(props: OrgInviteCodeGenerateProps) {
                     </Link>
                 </div>
             )}
+
+            {/* Optional custom code text */}
+            <div>
+                <label className='text-xs font-medium text-slate-600 mb-1.5 block'>
+                    Custom code (optional)
+                </label>
+                <input
+                    value={customCode}
+                    onChange={(e) => setCustomCode(e.target.value)}
+                    maxLength={32}
+                    autoComplete='off'
+                    placeholder='Leave empty to generate a random code'
+                    className='w-full p-2 rounded-md text-sm bg-white border border-slate-200 focus:border-slate-500 outline-none'
+                />
+                <p className='text-xs text-slate-400 mt-1'>4-32 letters and numbers, no spaces.</p>
+            </div>
 
             {/* Generate button */}
             <div className='flex justify-end pt-1'>
