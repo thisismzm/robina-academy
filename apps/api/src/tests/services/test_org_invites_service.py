@@ -647,3 +647,78 @@ class TestGetRedis:
         mock_pool.assert_called_once_with("redis://test", max_connections=10)
         mock_redis.assert_called_once_with(connection_pool=fake_pool)
         assert result is fake_client
+
+
+class TestInviteCodeUsageStats:
+    @staticmethod
+    def _code(uuid_, code, usergroup_id=None):
+        data = {
+            "invite_code": code,
+            "invite_code_uuid": uuid_,
+            "invite_code_type": "signup",
+            "created_at": "2024-01-01T00:00:00",
+        }
+        if usergroup_id:
+            data["usergroup_id"] = usergroup_id
+        return data
+
+    @pytest.mark.asyncio
+    async def test_record_usage_is_idempotent_per_user(self, db, org, admin_user):
+        from src.services.orgs.invites import record_invite_code_usage
+        from src.db.invite_code_usage import InviteCodeUsage
+        from sqlmodel import select
+
+        data = self._code("org_invite_code_a", "ALPHA")
+        await record_invite_code_usage(db, org.id, admin_user.id, data)
+        await record_invite_code_usage(db, org.id, admin_user.id, data)
+
+        rows = (await db.execute(select(InviteCodeUsage))).scalars().all()
+        assert len(rows) == 1
+        assert rows[0].code == "ALPHA"
+
+    @pytest.mark.asyncio
+    async def test_record_usage_never_raises(self, db):
+        from src.services.orgs.invites import record_invite_code_usage
+
+        # Bad org/user ids violate nothing on SQLite, so force a failure.
+        broken = AsyncMock()
+        broken.execute.side_effect = RuntimeError("db down")
+        await record_invite_code_usage(broken, 1, 1, self._code("u", "X"))
+
+    @pytest.mark.asyncio
+    async def test_stats_counts_live_and_deleted_codes(
+        self, mock_request, db, org, admin_user
+    ):
+        from src.services.orgs.invites import (
+            get_invite_code_stats,
+            get_invite_code_usage_users,
+            record_invite_code_usage,
+        )
+
+        await record_invite_code_usage(
+            db, org.id, admin_user.id, self._code("org_invite_code_gone", "OLDCODE")
+        )
+        live = [self._code("org_invite_code_live", "LIVECODE")]
+
+        with patch(
+            "src.services.orgs.invites.get_invite_codes",
+            new_callable=AsyncMock,
+            return_value=live,
+        ):
+            stats = await get_invite_code_stats(mock_request, org.id, admin_user, db, 30)
+
+        by_code = {c["code"]: c for c in stats["codes"]}
+        assert by_code["LIVECODE"]["status"] == "active"
+        assert by_code["LIVECODE"]["total_signups"] == 0
+        assert by_code["OLDCODE"]["status"] == "deleted"
+        assert by_code["OLDCODE"]["total_signups"] == 1
+        assert by_code["OLDCODE"]["signups_in_period"] == 1
+        assert stats["summary"]["signups_via_invite"] == 1
+        assert stats["summary"]["active_codes"] == 1
+        assert sum(p["total"] for p in stats["timeseries"]) == 1
+
+        with patch("src.services.orgs.invites.rbac_check", new_callable=AsyncMock):
+            users = await get_invite_code_usage_users(
+                mock_request, org.id, "org_invite_code_gone", admin_user, db
+            )
+        assert [u["username"] for u in users] == [admin_user.username]

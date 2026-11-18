@@ -21,6 +21,7 @@ from src.routers.integrations import skyroom as skyroom_integration
 from src.routers.payments import irankish as irankish_payments
 from src.routers.payments import zarinpal as zarinpal_payments
 from src.routers.payments import gateways as payment_gateways
+from src.routers.payments import discounts as payment_discounts
 from src.routers.ai import ai, magicblocks, courseplanning, rag, images, quiz, assignment_gen, scenario, audio
 from src.routers.boards import boards_playground
 from src.routers.orgs import ai_credits
@@ -160,6 +161,16 @@ v1_router.include_router(
     prefix="/payments/zarinpal",
     tags=["payments", "zarinpal"],
 )
+# Discount codes for course purchases: admin CRUD + buyer-side validation. Each
+# endpoint takes get_current_user and enforces auth/permissions in the service
+# layer. Registered BEFORE the shared /payments router for the same
+# more-specific-prefix-first reason as the gateway routers above.
+v1_router.include_router(
+    payment_discounts.router,
+    prefix="/payments/discounts",
+    tags=["payments", "discounts"],
+)
+
 # Shared, gateway-agnostic payment endpoints: which gateways are active and a
 # course's single shared price + the gateways it can be bought through. NO
 # router-level auth: /gateways and the course options probe are public so a

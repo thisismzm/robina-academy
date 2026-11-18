@@ -16,6 +16,7 @@ import {
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import Modal from '@components/Objects/StyledElements/Modal/Modal'
+import InviteCodeStats from './InviteCodeStats'
 import OrgInviteCodeGenerate from '@components/Objects/Modals/Dash/OrgAccess/OrgInviteCodeGenerate'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
@@ -280,6 +281,7 @@ function OrgAccess() {
               </div>
             </div>
           </div>
+          <InviteCodeStats />
           <OrgSignupFields />
           <div className="h-10"></div>
         </>

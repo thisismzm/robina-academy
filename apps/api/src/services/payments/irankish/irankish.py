@@ -35,6 +35,7 @@ paid is decided entirely by this ledger.
 
 import logging
 from datetime import datetime
+from typing import Optional
 from uuid import uuid4
 
 from fastapi import HTTPException, Request, status
@@ -63,6 +64,7 @@ from src.services.payments.irankish.crypto import (
     EnvelopeError,
     make_authentication_envelope,
 )
+from src.services.payments.discounts import record_redemption, resolve_discount
 from src.services.payments.pricing import (
     enrol_user_in_course,
     read_course_price,
@@ -172,6 +174,7 @@ async def create_checkout(
     course_id: int,
     revert_uri: str,
     current_user: PublicUser | AnonymousUser | APITokenUser,
+    discount_code: Optional[str] = None,
 ) -> dict:
     """Start a purchase: obtain a gateway token and return redirect form data.
 
@@ -210,6 +213,21 @@ async def create_checkout(
             detail="You already have access to this course.",
         )
 
+    # Apply an optional discount code. ``price`` becomes the amount actually
+    # charged at the gateway; the original price is kept on the payment row.
+    original_price = price
+    resolved = None
+    if discount_code and discount_code.strip():
+        resolved = await resolve_discount(
+            db_session,
+            org_id=org_id,
+            course=course,
+            price=price,
+            raw_code=discount_code,
+            user_id=acting_user_id,
+        )
+        price = resolved.final_amount
+
     # A unique, <=20-char request id; the gateway only requires uniqueness.
     request_id = uuid4().hex[:20]
 
@@ -247,6 +265,9 @@ async def create_checkout(
         user_id=acting_user_id,
         course_id=course_id,
         amount=price,
+        discount_code_id=resolved.discount.id if resolved else None,
+        original_amount=original_price if resolved else None,
+        discount_amount=resolved.discount_amount if resolved else None,
         request_id=request_id,
         status=IranKishPaymentStatusEnum.PENDING,
         creation_date=now,
@@ -277,6 +298,8 @@ async def create_checkout(
         "payment_url": irankish_client.get_payment_page_url(),
         "form_fields": {"tokenIdentity": token},
         "amount": price,
+        "original_amount": original_price if resolved else None,
+        "discount_amount": resolved.discount_amount if resolved else None,
     }
 
 
@@ -374,6 +397,7 @@ async def handle_callback(
 
     # Confirmed and settled: grant access and mark completed.
     await _grant_course_access(db_session, payment)
+    await record_redemption(db_session, payment.discount_code_id)
     payment.status = IranKishPaymentStatusEnum.COMPLETED
     payment.update_date = str(datetime.now())
     db_session.add(payment)
@@ -446,6 +470,9 @@ def to_read(payment: IranKishPayment) -> IranKishPaymentRead:
         user_id=payment.user_id,
         course_id=payment.course_id,
         amount=payment.amount,
+        discount_code_id=payment.discount_code_id,
+        original_amount=payment.original_amount,
+        discount_amount=payment.discount_amount,
         request_id=payment.request_id,
         token=payment.token,
         retrieval_reference_number=payment.retrieval_reference_number,

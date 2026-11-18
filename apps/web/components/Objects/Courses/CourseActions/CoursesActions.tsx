@@ -8,6 +8,7 @@ import { getOffersByResource } from '@services/payments/offers'
 import { startZarinPalCheckout } from '@services/payments/providers/zarinpal'
 import { startIranKishCheckout } from '@services/payments/providers/irankish'
 import { getActiveGateways } from '@services/payments/gateways'
+import { validateDiscountCode } from '@services/payments/discounts'
 import { UserPen, ClockIcon, ArrowRight, BookOpen, UserPlus, Banknote } from 'lucide-react'
 import { OfferCard } from './OfferCard'
 import { applyForContributor } from '@services/courses/courses'
@@ -102,6 +103,15 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
   const [isProgressOpen, setIsProgressOpen] = useState(false)
   // Which gateway's checkout is currently in flight ('zarinpal' | 'irankish' | null).
   const [checkoutLoading, setCheckoutLoading] = useState<'zarinpal' | 'irankish' | null>(null)
+  // Discount code entry. `appliedDiscount` holds the server-validated preview;
+  // checkout re-validates the code, so this is display-only.
+  const [discountInput, setDiscountInput] = useState('')
+  const [discountApplying, setDiscountApplying] = useState(false)
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string
+    discountAmount: number
+    finalAmount: number
+  } | null>(null)
   const org = useOrg() as any
   const { isUserPartOfTheOrg } = useOrgMembership()
   const queryClient = useQueryClient()
@@ -257,6 +267,43 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
     return true
   }
 
+  const handleApplyDiscount = async () => {
+    const code = discountInput.trim()
+    if (!code || !ensureCanCheckout()) return
+    setDiscountApplying(true)
+    try {
+      const res: any = await validateDiscountCode(
+        org.id,
+        Number((course as any).id),
+        code,
+        session.data?.tokens?.access_token
+      )
+      const body = res?.data ?? res
+      if (body?.valid) {
+        setAppliedDiscount({
+          code: body.code,
+          discountAmount: body.discount_amount,
+          finalAmount: body.final_amount,
+        })
+        toast.success(t('courses.discount_applied'))
+      } else {
+        setAppliedDiscount(null)
+        toast.error(t('courses.discount_invalid'))
+      }
+    } catch (error) {
+      console.error('Failed to validate discount code:', error)
+      setAppliedDiscount(null)
+      toast.error((error as any)?.message || t('courses.discount_invalid'))
+    } finally {
+      setDiscountApplying(false)
+    }
+  }
+
+  const handleRemoveDiscount = () => {
+    setAppliedDiscount(null)
+    setDiscountInput('')
+  }
+
   const handleZarinPalCheckout = async () => {
     if (!ensureCanCheckout()) return
 
@@ -266,7 +313,8 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
       const res = await startZarinPalCheckout(
         org.id,
         Number((course as any).id),
-        session.data?.tokens?.access_token
+        session.data?.tokens?.access_token,
+        appliedDiscount?.code
       )
       if (res?.payment_url) {
         // Hand the browser off to ZarinPal's hosted payment page (GET redirect).
@@ -291,7 +339,8 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
       const res = await startIranKishCheckout(
         org.id,
         Number((course as any).id),
-        session.data?.tokens?.access_token
+        session.data?.tokens?.access_token,
+        appliedDiscount?.code
       )
       if (res?.payment_url && res?.form_fields) {
         // IranKish requires the browser to POST the token to its payment page,
@@ -456,9 +505,60 @@ function CoursesActions({ courseuuid, orgslug, course, trailData }: CourseAction
                 </p>
               </div>
               <div className="shrink-0 text-end">
-                <div className="text-xl font-black text-gray-900">{formattedPrice}</div>
+                {appliedDiscount ? (
+                  <>
+                    <div className="text-xs text-gray-400 line-through">{formattedPrice}</div>
+                    <div className="text-xl font-black text-emerald-700">
+                      {formatCurrency(appliedDiscount.finalAmount, 'IRR', i18n.language)}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xl font-black text-gray-900">{formattedPrice}</div>
+                )}
               </div>
             </div>
+
+            {appliedDiscount ? (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                <span>
+                  {appliedDiscount.code}: -{formatCurrency(appliedDiscount.discountAmount, 'IRR', i18n.language)}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemoveDiscount}
+                  disabled={anyLoading}
+                  className="font-semibold underline cursor-pointer disabled:opacity-50"
+                >
+                  {t('courses.discount_remove')}
+                </button>
+              </div>
+            ) : (
+              <form
+                className="mt-3 flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleApplyDiscount()
+                }}
+              >
+                <input
+                  type="text"
+                  value={discountInput}
+                  onChange={(e) => setDiscountInput(e.target.value)}
+                  placeholder={t('courses.discount_code_placeholder')}
+                  aria-label={t('courses.discount_code_label')}
+                  autoComplete="off"
+                  dir="ltr"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  type="submit"
+                  disabled={discountApplying || anyLoading || discountInput.trim() === ''}
+                  className="shrink-0 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-700 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {t('courses.discount_apply')}
+                </button>
+              </form>
+            )}
 
             {buyableGateways.length > 1 && (
               <p className="text-xs text-gray-500 mt-3">

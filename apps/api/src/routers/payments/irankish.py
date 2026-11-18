@@ -112,7 +112,13 @@ async def api_create_checkout(
     # incoming request so the backend host is not hard-coded.
     revert_uri = str(request.url_for("api_irankish_callback"))
     result = await create_checkout(
-        request, db_session, org_id, course_id, revert_uri, current_user
+        request,
+        db_session,
+        org_id,
+        course_id,
+        revert_uri,
+        current_user,
+        discount_code=_body.discount_code if _body else None,
     )
     return IranKishCheckoutResponse(**result)
 

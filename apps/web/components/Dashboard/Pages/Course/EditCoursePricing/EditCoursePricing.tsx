@@ -17,6 +17,8 @@ import { Label } from '@components/ui/label'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { FloppyDisk } from '@phosphor-icons/react'
 import { Banknote, Info } from 'lucide-react'
+import Link from 'next/link'
+import { getUriWithOrg } from '@services/config/config'
 
 // The single, gateway-agnostic key the backend stores the price under. The
 // shared price is read from here (with a fallback to legacy per-gateway keys so
@@ -213,6 +215,16 @@ const EditCoursePricing: React.FC = () => {
           </div>
         </div>
       </div>
+      {hasActiveGateway && (
+        <p className="px-1 text-sm text-gray-500">
+          <Link
+            href={getUriWithOrg(org.slug, '/dash/discounts/codes')}
+            className="font-semibold text-gray-800 underline"
+          >
+            {t('dashboard.courses.pricing.manage_discounts')}
+          </Link>
+        </p>
+      )}
     </div>
   )
 }
