@@ -1145,9 +1145,11 @@ async def api_upload_org_og_image(
 @router.post(
     "/{org_id}/invites",
     summary="Create an invite code",
-    description="Create a new invite code for the organization, optionally linked to a usergroup.",
+    description="Create a new invite code for the organization, optionally linked to a usergroup. Pass `code` to choose the code text (4-32 letters/numbers); otherwise one is generated.",
     responses={
         200: {"description": "Invite code created."},
+        400: {"description": "Custom code is invalid or the per-organization limit is reached"},
+        409: {"description": "A code with this text already exists"},
         401: {"description": "Not authenticated"},
         403: {"description": "Caller is not an organization administrator"},
         404: {"description": "Organization or usergroup not found"},
@@ -1157,13 +1159,16 @@ async def api_create_invite_code(
     request: Request,
     org_id: int,
     usergroup_id: Optional[int] = None,
+    code: Optional[str] = Query(None, max_length=64),
     current_user: PublicUser = Depends(get_current_user),
     db_session: AsyncSession = Depends(get_db_session),
 ):
     """
-    Create invite code, optionally linked to a usergroup
+    Create invite code, optionally linked to a usergroup and with custom text
     """
-    return await create_invite_code(request, org_id, current_user, db_session, usergroup_id)
+    return await create_invite_code(
+        request, org_id, current_user, db_session, usergroup_id, code
+    )
 
 
 @router.get(

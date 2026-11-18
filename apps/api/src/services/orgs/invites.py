@@ -25,6 +25,9 @@ from src.services.users.emails import send_invitation_email
 
 logger = logging.getLogger(__name__)
 
+MIN_CUSTOM_CODE_LENGTH = 4
+MAX_CUSTOM_CODE_LENGTH = 32
+
 _redis_pool: Optional[redis.ConnectionPool] = None
 
 def _get_redis(redis_conn_string: str) -> redis.Redis:
@@ -66,6 +69,7 @@ async def create_invite_code(
     current_user: PublicUser | AnonymousUser,
     db_session: AsyncSession,
     usergroup_id: Optional[int] = None,
+    custom_code: Optional[str] = None,
 ):
     # Every visitor to the shared demo holds admin on it, so without this an
     # invite code minted there is a way for anyone to have the platform email
@@ -136,7 +140,33 @@ async def create_invite_code(
         alphabet = string.ascii_letters + string.digits
         return "".join(secrets.choice(alphabet) for _ in range(length))
 
-    generated_invite_code = generate_code()
+    if custom_code is not None and custom_code.strip():
+        generated_invite_code = custom_code.strip()
+        # Letters and digits only: get_invite_code rejects anything else, and
+        # the code is interpolated into a Redis key/glob pattern.
+        if not (
+            generated_invite_code.isascii()
+            and generated_invite_code.isalnum()
+            and MIN_CUSTOM_CODE_LENGTH <= len(generated_invite_code) <= MAX_CUSTOM_CODE_LENGTH
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invite code must be {MIN_CUSTOM_CODE_LENGTH}-{MAX_CUSTOM_CODE_LENGTH} "
+                    "characters, letters and numbers only"
+                ),
+            )
+        # Codes are looked up by value, so they must be unique within the org.
+        for _ in r.scan_iter(
+            match=f"org_invite_code_*:org:{org.org_uuid}:code:{generated_invite_code}",
+            count=100,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="This invite code already exists",
+            )
+    else:
+        generated_invite_code = generate_code()
     invite_code_uuid = f"org_invite_code_{uuid.uuid4()}"
 
     # time to live in days to seconds
