@@ -139,10 +139,10 @@ function AssignmentStudentActivity() {
     const parsed = parseDueDate(dueDateRaw);
     if (!parsed) return dueDateRaw ?? '';
     return parsed.hasTime
-      ? formatDate(parsed.at, undefined, {
+      ? formatDate(parsed.at, i18n.language, {
           year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
         })
-      : formatDate(parsed.at, undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      : formatDate(parsed.at, i18n.language, { year: 'numeric', month: 'short', day: 'numeric' });
   }, [dueDateRaw, i18n.language]);
 
   useEffect(() => {

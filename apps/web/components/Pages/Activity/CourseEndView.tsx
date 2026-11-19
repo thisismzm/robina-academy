@@ -202,7 +202,7 @@ const CourseEndView: React.FC<CourseEndViewProps> = ({
       certificateInstructor: config.certificate_instructor,
       certificateId: userCertificate.certificate_user.user_certification_uuid,
       learnerName,
-      awardedDate: formatDate(new Date(userCertificate.certificate_user.created_at), undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
+      awardedDate: formatDate(new Date(userCertificate.certificate_user.created_at), i18n.language, { year: 'numeric', month: 'long', day: 'numeric' }),
       qrCodeLink,
     };
   }, [userCertificate, learnerName, qrCodeLink, i18n.language]);
