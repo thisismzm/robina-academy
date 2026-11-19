@@ -23,6 +23,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query/keys'
 import dayjs from 'dayjs'
 import { SafeImage } from '@components/Objects/SafeImage'
+import { formatDate } from '@/lib/format'
 
 interface CommunitySidebarProps {
   community: Community
@@ -51,7 +52,7 @@ export function CommunitySidebar({
     staleTime: 60_000,
   })
 
-  const createdDate = dayjs(community.creation_date).format('MMM D, YYYY')
+  const createdDate = formatDate(dayjs(community.creation_date), undefined, { dateStyle: 'medium' })
 
   const thumbnailUrl = community.thumbnail_image && org?.org_uuid
     ? getCommunityThumbnailMediaDirectory(

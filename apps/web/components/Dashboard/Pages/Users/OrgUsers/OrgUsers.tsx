@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@components/ui/select'
+import { formatDate } from '@/lib/format'
 
 const ITEMS_PER_PAGE = 10
 
@@ -47,7 +48,7 @@ function formatShortDate(dateStr: string | null | undefined): string {
   try {
     const date = new Date(dateStr)
     if (isNaN(date.getTime())) return 'n/a'
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return formatDate(date, undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   } catch {
     return 'n/a'
   }

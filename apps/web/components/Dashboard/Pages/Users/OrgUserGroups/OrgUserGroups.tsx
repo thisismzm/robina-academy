@@ -18,6 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query/keys'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@components/ui/badge'
+import { formatDate } from '@/lib/format'
 
 function OrgUserGroups() {
     const { t } = useTranslation()
@@ -184,7 +185,7 @@ function OrgUserGroups() {
                                                             try {
                                                                 const d = new Date(usergroup.creation_date)
                                                                 if (isNaN(d.getTime())) return usergroup.creation_date
-                                                                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                                                return formatDate(d, undefined, { month: 'short', day: 'numeric', year: 'numeric' })
                                                             } catch { return usergroup.creation_date }
                                                         })()}
                                                     </span>

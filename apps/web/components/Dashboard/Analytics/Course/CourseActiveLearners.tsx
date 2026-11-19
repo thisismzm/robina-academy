@@ -13,10 +13,11 @@ import {
 } from 'recharts'
 import { UsersThree } from '@phosphor-icons/react'
 import CourseWidgetCard, { WidgetIcon, AnimatedNumber } from './CourseWidgetCard'
+import { formatDate } from '@/lib/format'
 
 const kFormatter = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v))
 const shortDate = (v: string) =>
-  new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  formatDate(new Date(v), undefined, { month: 'short', day: 'numeric' })
 
 export default function CourseActiveLearners({
   courseId,

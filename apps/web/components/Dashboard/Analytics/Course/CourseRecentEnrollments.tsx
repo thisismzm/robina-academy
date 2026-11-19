@@ -6,6 +6,7 @@ import { UserList } from '@phosphor-icons/react'
 import UserAvatar from '@components/Objects/UserAvatar'
 import { getUserAvatarMediaDirectory } from '@services/media/media'
 import CourseWidgetCard, { WidgetIcon, AnimatedNumber, usePagination, PaginationBar } from './CourseWidgetCard'
+import { formatDate } from '@/lib/format'
 
 function EnrollmentRow({
   row,
@@ -42,7 +43,7 @@ function EnrollmentRow({
         )}
       </div>
       <span className={`${compact ? 'text-[10px]' : 'text-xs'} text-gray-400 whitespace-nowrap`}>
-        {new Date(row.enrolled_at ?? row.timestamp).toLocaleDateString()}
+        {formatDate(new Date(row.enrolled_at ?? row.timestamp))}
       </span>
     </div>
   )

@@ -12,6 +12,7 @@ import {
 } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { getAPIUrl } from '@services/config/config'
+import { formatDate, formatTime } from '@/lib/format'
 
 interface Submission {
   id: string
@@ -118,12 +119,12 @@ export default function SubmissionHistory({
       {data.submissions.map((sub) => {
         const isExpanded = expandedId === sub.id
         const date = new Date(sub.created_at)
-        const dateStr = date.toLocaleDateString(undefined, {
+        const dateStr = formatDate(date, undefined, {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
         })
-        const timeStr = date.toLocaleTimeString(undefined, {
+        const timeStr = formatTime(date, undefined, {
           hour: '2-digit',
           minute: '2-digit',
         })

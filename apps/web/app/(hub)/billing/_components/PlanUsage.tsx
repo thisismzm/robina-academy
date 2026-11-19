@@ -44,6 +44,7 @@ import type { OrgUsageResponse, ActiveUsersSummary } from '@services/orgs/usage'
 import UsageBar from './UsageBar'
 import BillingSummary from './BillingSummary'
 import InvoiceHistory from './InvoiceHistory'
+import { formatDate } from '@/lib/format'
 
 interface PlanUsageProps {
   org: any
@@ -136,7 +137,7 @@ export default function PlanUsage({
   })()
 
   const periodEnd = subscription?.currentPeriodEnd
-    ? new Date(subscription.currentPeriodEnd * 1000).toLocaleDateString('en-US', {
+    ? formatDate(new Date(subscription.currentPeriodEnd * 1000), undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

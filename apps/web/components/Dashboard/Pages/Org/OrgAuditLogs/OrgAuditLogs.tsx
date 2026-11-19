@@ -21,6 +21,7 @@ import {
 } from '@components/ui/select'
 import { useTranslation } from 'react-i18next'
 import FeatureGate from '@components/Dashboard/Shared/FeatureGate/FeatureGate'
+import { formatDate, formatTime } from '@/lib/format'
 
 const ITEMS_PER_PAGE = 20
 
@@ -367,8 +368,8 @@ const OrgAuditLogs = () => {
                 <tr key={log.id} className="border-b border-gray-200 border-dashed hover:bg-gray-50/50 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex flex-col text-sm">
-                      <span className="font-semibold text-gray-700">{dayjs(log.created_at).format('MMM DD, YYYY')}</span>
-                      <span className="text-[10px] text-gray-400">{dayjs(log.created_at).format('HH:mm:ss')}</span>
+                      <span className="font-semibold text-gray-700">{formatDate(dayjs(log.created_at), undefined, { dateStyle: 'medium' })}</span>
+                      <span className="text-[10px] text-gray-400">{formatTime(dayjs(log.created_at), undefined, { second: '2-digit' })}</span>
                     </div>
                   </td>
                   <td className="py-3 px-4">

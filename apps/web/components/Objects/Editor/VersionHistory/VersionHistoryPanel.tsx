@@ -10,6 +10,7 @@ import EditorPreview from '../EditorPreview'
 import { CourseProvider } from '@components/Contexts/CourseContext'
 import { useTranslation } from 'react-i18next'
 import { useDirection } from '@hooks/useDirection'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 interface VersionHistoryPanelProps {
   isOpen: boolean
@@ -51,7 +52,7 @@ function VersionHistoryPanel({
       if (diffHours < 24) return t('editor.versioning.hours_ago', { count: diffHours })
       if (diffDays < 7) return t('editor.versioning.days_ago', { count: diffDays })
 
-      return date.toLocaleDateString(undefined, {
+      return formatLocalizedDate(date, undefined, {
         month: 'short',
         day: 'numeric',
         year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,

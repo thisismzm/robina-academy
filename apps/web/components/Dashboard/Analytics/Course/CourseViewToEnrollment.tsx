@@ -5,10 +5,11 @@ import { useCoursePipe } from '../useAnalyticsDashboard'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ArrowsLeftRight } from '@phosphor-icons/react'
 import CourseWidgetCard, { WidgetIcon } from './CourseWidgetCard'
+import { formatDate } from '@/lib/format'
 
 function shortDate(v: string) {
   const d = new Date(v)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDate(d, undefined, { month: 'short', day: 'numeric' })
 }
 
 export default function CourseViewToEnrollment({

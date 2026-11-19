@@ -38,6 +38,7 @@ import {
     YAxis,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/lib/format'
 
 type Submission = {
     assignmentusersubmission_uuid: string;
@@ -443,7 +444,7 @@ function AssignmentAnalyticsSubPage({ assignment_uuid }: { assignment_uuid: stri
                                         tickLine={false}
                                         tickFormatter={(v) => {
                                             const d = new Date(v);
-                                            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                            return formatDate(d, undefined, { month: 'short', day: 'numeric' });
                                         }}
                                     />
                                     <YAxis
@@ -456,7 +457,7 @@ function AssignmentAnalyticsSubPage({ assignment_uuid }: { assignment_uuid: stri
                                     />
                                     <Tooltip
                                         contentStyle={{ fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 10px rgba(0,0,0,0.08)' }}
-                                        labelFormatter={(v: any) => new Date(v).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                        labelFormatter={(v: any) => formatDate(new Date(v), undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                                     />
                                     {assignmentObj?.due_date && (
                                         <ReferenceLine

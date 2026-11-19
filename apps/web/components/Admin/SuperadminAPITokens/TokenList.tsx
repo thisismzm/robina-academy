@@ -34,11 +34,13 @@ function tokenStatus(t: SuperadminToken): 'active' | 'revoked' | 'expired' {
   return 'active'
 }
 
+import { formatDateTime } from '@/lib/format'
+
 function fmtDate(s: string | null | undefined, naLabel: string): string {
   if (!s) return naLabel
   const d = new Date(s)
   if (Number.isNaN(d.getTime())) return s
-  return d.toLocaleString()
+  return formatDateTime(d)
 }
 
 export default function TokenList() {

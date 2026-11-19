@@ -22,6 +22,7 @@ import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 import OrgSignupFields from './OrgSignupFields'
+import { formatDate } from '@/lib/format'
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = React.useState(false)
@@ -236,7 +237,7 @@ function OrgAccess() {
                           )}
                         </td>
                         <td className="py-3 px-4 sm:px-6 text-sm text-gray-600">
-                          {dayjs(invite.created_at).add(1, 'year').format('DD/MM/YYYY')}
+                          {formatDate(dayjs(invite.created_at).add(1, 'year'), undefined, { year: 'numeric', month: '2-digit', day: '2-digit' })}
                         </td>
                         <td className="py-3 px-4 sm:px-6">
                           <ConfirmationModal

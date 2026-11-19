@@ -34,6 +34,7 @@ import {
   ArrowClockwise,
   SlidersHorizontal,
 } from '@phosphor-icons/react'
+import { formatDate } from '@/lib/format'
 
 function getLogoUrl(orgUuid: string, logoImage: string): string {
   if (logoImage.startsWith('http')) return logoImage
@@ -315,8 +316,8 @@ function OverviewTab({ org, orgId, accessToken }: { org: any; orgId: string; acc
           <InfoRow label="Email" value={org.email} />
           <InfoRow label="Slug" value={org.slug} mono />
           <InfoRow label="UUID" value={org.org_uuid} mono />
-          <InfoRow label="Created" value={new Date(org.creation_date).toLocaleDateString()} />
-          <InfoRow label="Updated" value={new Date(org.update_date).toLocaleDateString()} />
+          <InfoRow label="Created" value={formatDate(new Date(org.creation_date))} />
+          <InfoRow label="Updated" value={formatDate(new Date(org.update_date))} />
           {org.description && <InfoRow label="Description" value={org.description} />}
         </div>
 
@@ -504,7 +505,7 @@ function CoursesTab({
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-sm text-white/40">
-                    {new Date(course.creation_date).toLocaleDateString()}
+                    {formatDate(new Date(course.creation_date))}
                   </span>
                 </td>
               </tr>
@@ -620,7 +621,7 @@ function UsersTab({ orgId, accessToken }: { orgId: string; accessToken: string }
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-sm text-white/40">
-                      {user.creation_date ? new Date(user.creation_date).toLocaleDateString() : 'n/a'}
+                      {user.creation_date ? formatDate(new Date(user.creation_date)) : 'n/a'}
                     </span>
                   </td>
                 </tr>

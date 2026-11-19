@@ -15,6 +15,7 @@ import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { sortTasksByOrder } from '@/lib/assignments/taskOrder'
+import { formatDate } from '@/lib/format'
 
 type ParsedDueDate = { at: Date; hasTime: boolean }
 
@@ -137,12 +138,11 @@ function AssignmentStudentActivity() {
   const dueDateLabel = useMemo(() => {
     const parsed = parseDueDate(dueDateRaw);
     if (!parsed) return dueDateRaw ?? '';
-    const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
     return parsed.hasTime
-      ? parsed.at.toLocaleString(locale, {
+      ? formatDate(parsed.at, undefined, {
           year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
         })
-      : parsed.at.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
+      : formatDate(parsed.at, undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }, [dueDateRaw, i18n.language]);
 
   useEffect(() => {

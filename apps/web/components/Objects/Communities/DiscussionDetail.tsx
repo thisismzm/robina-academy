@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu"
+import { formatRelative } from '@/lib/format'
 
 interface DiscussionDetailProps {
   discussion: DiscussionWithAuthor
@@ -81,7 +82,7 @@ export function DiscussionDetail({
   const accessToken = session?.data?.tokens?.access_token
   const currentUserId = session?.data?.user?.id
 
-  const timeAgo = dayjs(discussion.creation_date).fromNow()
+  const timeAgo = formatRelative(discussion.creation_date)
   const isAuthor = currentUserId === discussion.author_id
   const labelInfo = getLabelInfo(discussion.label || 'general')
 

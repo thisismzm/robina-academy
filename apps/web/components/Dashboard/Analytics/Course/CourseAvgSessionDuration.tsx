@@ -5,6 +5,7 @@ import { useCoursePipe } from '../useAnalyticsDashboard'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { ClockCountdown } from '@phosphor-icons/react'
 import CourseWidgetCard, { WidgetIcon } from './CourseWidgetCard'
+import { formatDate } from '@/lib/format'
 
 function formatSeconds(seconds: number): string {
   if (!seconds || seconds <= 0) return '0s'
@@ -17,7 +18,7 @@ function formatSeconds(seconds: number): string {
 
 function shortDate(v: string) {
   const d = new Date(v)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDate(d, undefined, { month: 'short', day: 'numeric' })
 }
 
 export default function CourseAvgSessionDuration({

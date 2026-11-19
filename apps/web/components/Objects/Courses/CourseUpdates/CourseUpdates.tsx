@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
+import { formatDate, formatRelative } from '@/lib/format'
 
 dayjs.extend(relativeTime);
 
@@ -225,9 +226,9 @@ const UpdatesListView = () => {
             <div className='flex space-x-2 items-center'>
               <span> {update.title}</span>
               <span
-                title={t('common.created_at') + " " + dayjs(update.creation_date).format('MMMM D, YYYY')}
+                title={t('common.created_at') + " " + formatDate(dayjs(update.creation_date), undefined, { dateStyle: 'long' })}
                 className='text-xs font-semibold text-gray-300'>
-                {dayjs(update.creation_date).fromNow()}
+                {formatRelative(update.creation_date)}
               </span>
             </div>
             {adminStatus.isAdmin &&  !adminStatus.loading && <DeleteUpdateButton update={update} />}</div>

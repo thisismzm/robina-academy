@@ -41,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from '@components/ui/table'
+import { formatDate } from '@/lib/format'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,7 +51,7 @@ function fmt(amount: number, currency = 'USD') {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatDate(new Date(iso), undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function CardChip({ brand, last4 }: { brand?: string; last4?: string }) {

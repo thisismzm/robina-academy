@@ -15,6 +15,7 @@ import {
 } from '@services/utils/ts/requests'
 import { getErrorMessage } from '@services/utils/ts/errorMessage'
 import { queryKeys } from '@/lib/query/keys'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 /**
  * Shared state for the two org security tabs (Users → Two-factor / Sign-in
@@ -162,7 +163,7 @@ export const formatDate = (value: string | null | undefined): string => {
   if (!value) return ''
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return String(value)
-  return d.toLocaleDateString(undefined, {
+  return formatLocalizedDate(d, undefined, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

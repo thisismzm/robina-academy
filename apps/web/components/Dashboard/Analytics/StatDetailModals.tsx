@@ -17,6 +17,7 @@ import {
 } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { getUserAvatarMediaDirectory } from '@services/media/media'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -69,7 +70,7 @@ function relativeTime(ts: string): string {
 }
 
 function formatDate(ts: string): string {
-  return new Date(ts).toLocaleDateString('en-US', {
+  return formatLocalizedDate(new Date(ts), undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

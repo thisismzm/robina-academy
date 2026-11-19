@@ -13,6 +13,7 @@ import OrgSquareLogo from '@components/Objects/Org/OrgSquareLogo'
 import { apiFetch } from '@services/utils/ts/requests'
 import { billingPortal, fetchSubscription } from '../billing/_lib/billingClient'
 import { findPlan, resolvePlanIdFromOrg } from '../billing/_lib/plans'
+import { formatDate } from '@/lib/format'
 
 function planLabel(planId: string | undefined): string {
   if (!planId) return 'Free'
@@ -31,7 +32,7 @@ function StatusPill({ subscription, t }: { subscription: any; t: any }) {
   // A subscription set to cancel at period end takes visual priority.
   if (subscription.cancelAtPeriodEnd) {
     const end = subscription.currentPeriodEnd
-      ? new Date(subscription.currentPeriodEnd * 1000).toLocaleDateString()
+      ? formatDate(new Date(subscription.currentPeriodEnd * 1000))
       : null
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700">
@@ -81,7 +82,7 @@ function OrgSubscriptionRow({ org, enabled }: { org: any; enabled: boolean }) {
   const planId = subscription?.plan ?? resolvePlanIdFromOrg(org)
   const periodEnd =
     subscription?.currentPeriodEnd && !subscription.cancelAtPeriodEnd
-      ? new Date(subscription.currentPeriodEnd * 1000).toLocaleDateString()
+      ? formatDate(new Date(subscription.currentPeriodEnd * 1000))
       : null
 
   return (

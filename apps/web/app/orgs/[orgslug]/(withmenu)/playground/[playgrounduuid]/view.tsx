@@ -23,6 +23,7 @@ import UserAvatar from '@components/Objects/UserAvatar'
 import { Playground } from '@services/playgrounds/playgrounds'
 import { getPlaygroundThumbnailMediaDirectory, getUserAvatarMediaDirectory } from '@services/media/media'
 import { useTrackView, AnalyticsEvent } from '@services/analytics'
+import { formatDate } from '@/lib/format'
 
 dayjs.extend(relativeTime)
 
@@ -89,7 +90,7 @@ export default function PlaygroundViewClient({
 
   const accessBadge = ACCESS_BADGES[playground.access_type] ?? ACCESS_BADGES.authenticated
   const AccessIcon = accessBadge.icon
-  const createdDate = dayjs(playground.creation_date).format('MMM D, YYYY')
+  const createdDate = formatDate(dayjs(playground.creation_date), undefined, { dateStyle: 'medium' })
 
   const authorName = playground.author_first_name
     ? `${playground.author_first_name}${playground.author_last_name ? ` ${playground.author_last_name}` : ''}`

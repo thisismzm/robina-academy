@@ -9,7 +9,9 @@
 
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import i18n from 'i18next'
 import { baseCode } from './direction'
+import { toPersianDigits } from './jalali'
 
 dayjs.extend(relativeTime)
 
@@ -110,34 +112,105 @@ export async function loadDateLocale(lng?: string): Promise<void> {
   }
 }
 
+/** The language to format for: the caller's, else the active i18next language. */
+function activeLanguage(lng?: string): string | undefined {
+  return lng || i18n.language || undefined
+}
+
+function isPersian(lng?: string): boolean {
+  return baseCode(activeLanguage(lng)) === 'fa'
+}
+
+/**
+ * DATES: Persian (fa) is the one exception to the Gregorian + Latin digits rule
+ * above. It gets the Solar Hijri (Jalali) calendar and Persian digits, so
+ * "۱۴۰۴ فروردین ۱". Every other language keeps Gregorian + Latin digits.
+ * Numbers and currency are unaffected; this only applies to dates and times.
+ */
+function dateLocale(lng?: string): string {
+  return isPersian(lng) ? 'fa-u-ca-persian-nu-arabext' : intlLocale(activeLanguage(lng))
+}
+
+const FIELD_OPTIONS = [
+  'weekday', 'era', 'year', 'month', 'day', 'dayPeriod',
+  'hour', 'minute', 'second', 'fractionalSecondDigits', 'timeZoneName',
+] as const
+
+function hasFieldOptions(options?: Intl.DateTimeFormatOptions): boolean {
+  return !!options && FIELD_OPTIONS.some((k) => options[k] !== undefined)
+}
+
+/** Anything `new Date()` accepts, plus dayjs objects. */
+export type DateLike = string | number | Date | { toDate(): Date }
+
+function toDate(value: DateLike): Date {
+  if (value instanceof Date) return value
+  if (typeof value === 'object') return value.toDate()
+  return new Date(value)
+}
+
+function formatWith(
+  value: DateLike,
+  lng: string | undefined,
+  defaults: Intl.DateTimeFormatOptions,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  const date = toDate(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const persian = isPersian(lng)
+  // `dateStyle`/`timeStyle` cannot be combined with individual fields.
+  const base = hasFieldOptions(options) ? {} : defaults
+  return new Intl.DateTimeFormat(dateLocale(lng), {
+    ...(persian ? {} : { calendar: 'gregory' }),
+    ...base,
+    ...options,
+  }).format(date)
+}
+
 /**
  * Absolute date. Goes through Intl rather than dayjs on purpose: dayjs's `ar`
  * locale emits Arabic-Indic digits in its date formats, which is exactly what
- * intlLocale() is there to avoid.
+ * intlLocale() is there to avoid. `lng` defaults to the active UI language.
  */
 export function formatDate(
-  value: string | number | Date,
+  value: DateLike,
   lng?: string,
   options?: Intl.DateTimeFormatOptions
 ): string {
-  return new Intl.DateTimeFormat(intlLocale(lng), {
-    dateStyle: 'medium',
-    calendar: 'gregory',
-    ...options,
-  }).format(new Date(value))
+  return formatWith(value, lng, { dateStyle: 'medium' }, options)
 }
 
 export function formatDateTime(
-  value: string | number | Date,
+  value: DateLike,
   lng?: string,
   options?: Intl.DateTimeFormatOptions
 ): string {
-  return formatDate(value, lng, { dateStyle: 'medium', timeStyle: 'short', ...options })
+  return formatWith(value, lng, { dateStyle: 'medium', timeStyle: 'short' }, options)
 }
 
-/** "2 hours ago". Words, not digits, which is why dayjs is fine here. */
-export function formatRelative(value: string | number | Date, lng?: string): string {
-  return dayjs(value).locale(baseCode(lng)).fromNow()
+/** Time of day only, 24-hour, e.g. "14:05:09" or "۱۴:۰۵:۰۹". */
+export function formatTime(
+  value: DateLike,
+  lng?: string,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  return formatWith(
+    value,
+    lng,
+    {},
+    { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', ...options }
+  )
+}
+
+/** Year as displayed in the active calendar, e.g. 2025 or ۱۴۰۴. */
+export function formatYear(value: DateLike, lng?: string): string {
+  return formatWith(value, lng, {}, { year: 'numeric' })
+}
+
+/** "2 hours ago". dayjs supplies the words; Persian digits are applied for fa. */
+export function formatRelative(value: DateLike, lng?: string): string {
+  const text = dayjs(toDate(value)).locale(baseCode(activeLanguage(lng))).fromNow()
+  return isPersian(lng) ? toPersianDigits(text) : text
 }
 
 export function formatNumber(
