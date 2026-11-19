@@ -77,6 +77,7 @@ import {
 } from '@services/webhooks/webhooks'
 import FeatureGate from '@components/Dashboard/Shared/FeatureGate/FeatureGate'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 // Types for API-driven event registry
 interface EventInfo {
@@ -330,7 +331,7 @@ const OrgEditAutomations: React.FC = () => {
 
   const formatDate = (dateStr: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
+      return formatLocalizedDate(new Date(dateStr), undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

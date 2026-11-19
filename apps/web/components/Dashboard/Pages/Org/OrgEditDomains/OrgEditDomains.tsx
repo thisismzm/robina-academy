@@ -57,6 +57,7 @@ import FeatureGate from '@components/Dashboard/Shared/FeatureGate/FeatureGate'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
 import { useUpgradeModal } from '@components/Dashboard/Shared/PlanRestricted/UpgradeModalContext'
 import { getErrorMessage } from '@services/utils/ts/errorMessage'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 const OrgEditDomains: React.FC = () => {
   const session = useLHSession() as any
@@ -322,7 +323,7 @@ const OrgEditDomains: React.FC = () => {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Never'
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
+      return formatLocalizedDate(new Date(dateStr), undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

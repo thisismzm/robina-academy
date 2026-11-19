@@ -11,10 +11,11 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts'
+import { formatDate } from '@/lib/format'
 
 const kFormatter = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v))
 const shortDate = (v: string) =>
-  new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  formatDate(new Date(v), undefined, { month: 'short', day: 'numeric' })
 
 // Recharts types the tooltip label as ReactNode, which includes undefined, so
 // it cannot go straight into new Date(). Narrow to what Date actually accepts
@@ -23,7 +24,7 @@ const fullDate = (label: unknown) => {
   if (typeof label !== 'string' && typeof label !== 'number') return ''
   const parsed = new Date(label)
   if (Number.isNaN(parsed.getTime())) return ''
-  return parsed.toLocaleDateString('en-US', {
+  return formatDate(parsed, undefined, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',

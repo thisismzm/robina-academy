@@ -18,6 +18,7 @@ import {
   ShieldStar,
   EnvelopeSimple,
 } from '@phosphor-icons/react'
+import { formatDate } from '@/lib/format'
 
 interface OrgMembership {
   id: number
@@ -434,14 +435,14 @@ export default function UserList() {
                       <td className="px-4 py-3">
                         <span className="text-sm text-white/40">
                           {u.creation_date
-                            ? new Date(u.creation_date).toLocaleDateString()
+                            ? formatDate(new Date(u.creation_date))
                             : t('admin.common.na')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm text-white/40">
                           {u.update_date
-                            ? new Date(u.update_date).toLocaleDateString()
+                            ? formatDate(new Date(u.update_date))
                             : t('admin.common.na')}
                         </span>
                       </td>

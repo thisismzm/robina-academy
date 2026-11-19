@@ -1,11 +1,12 @@
 import { getUserAvatarMediaDirectory } from '@services/media/media'
+import { formatDate } from '@/lib/format'
 
 export function fmtDate(dateStr: string | null | undefined): string {
   if (!dateStr) return 'n/a'
   try {
     const d = new Date(dateStr)
     if (isNaN(d.getTime())) return 'n/a'
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return formatDate(d, undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   } catch {
     return 'n/a'
   }
@@ -16,7 +17,7 @@ export function fmtDateTime(dateStr: string | null | undefined): string {
   try {
     const d = new Date(dateStr)
     if (isNaN(d.getTime())) return 'n/a'
-    return d.toLocaleString('en-US', {
+    return formatDate(d, undefined, {
       month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
   } catch {

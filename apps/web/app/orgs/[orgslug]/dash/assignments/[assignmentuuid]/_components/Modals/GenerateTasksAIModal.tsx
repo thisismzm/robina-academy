@@ -16,6 +16,7 @@ import {
   deleteAIAssignmentHistory,
 } from '@services/ai/generation'
 import { QUIZ_RESPONSE_SINGLE, resolveQuizResponseType } from '@/lib/quiz/modes'
+import { formatDate } from '@/lib/format'
 
 // ---------------------------------------------------------------------------
 // "Generate tasks with AI": teacher-facing entry point on the assignment
@@ -547,7 +548,7 @@ function HistoryList({
                 {item.creation_date && (
                   <span className="inline-flex items-center gap-1">
                     <Clock weight="duotone" size={11} />
-                    {new Date(item.creation_date).toLocaleDateString()}
+                    {formatDate(new Date(item.creation_date))}
                   </span>
                 )}
               </div>

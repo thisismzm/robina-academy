@@ -29,6 +29,7 @@ import UserAvatar from '@components/Objects/UserAvatar'
 import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/useDebounce'
 import { getUserAvatarMediaDirectory } from '@services/media/media'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 type EditCourseContributorsProps = {
     orgslug: string
@@ -76,7 +77,7 @@ interface BulkAddResponse {
 // Helper function for date formatting
 const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return formatLocalizedDate(date, undefined, { 
         year: 'numeric',
         month: 'short',
         day: 'numeric'

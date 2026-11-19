@@ -15,6 +15,7 @@ import {
   certificateFileName,
   downloadCertificateNodeAsPdf,
 } from '@services/courses/certificateDownload';
+import { formatDate } from '@/lib/format'
 
 interface CertificatePageProps {
   orgslug: string;
@@ -101,7 +102,7 @@ const CertificatePage: React.FC<CertificatePageProps> = ({ orgslug, courseid, qr
       certificateInstructor: config.certificate_instructor,
       certificateId: userCertificate.certificate_user.user_certification_uuid,
       learnerName,
-      awardedDate: new Date(userCertificate.certificate_user.created_at).toLocaleDateString('en-US', {
+      awardedDate: formatDate(new Date(userCertificate.certificate_user.created_at), undefined, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

@@ -13,6 +13,7 @@ import { Buildings, Globe, User, CaretLeft, CaretRight, BookOpen, MagnifyingGlas
 import CreateOrganizationModal from '@components/Admin/CreateOrganizationModal'
 import EELicenseError from '@components/Admin/EELicenseError'
 import { useTranslation } from 'react-i18next'
+import { formatDate } from '@/lib/format'
 
 interface PaginatedOrgResponse {
   items: OrgWithCount[]
@@ -514,10 +515,10 @@ export default function OrganizationList() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-sm text-white/40">{new Date(org.creation_date).toLocaleDateString()}</span>
+                  <span className="text-sm text-white/40">{formatDate(new Date(org.creation_date))}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-sm text-white/40">{new Date(org.update_date).toLocaleDateString()}</span>
+                  <span className="text-sm text-white/40">{formatDate(new Date(org.update_date))}</span>
                 </td>
                 <td className="px-4 py-3">
                   <a

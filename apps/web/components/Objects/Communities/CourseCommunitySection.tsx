@@ -13,6 +13,7 @@ import { DiscussionWithAuthor, getDiscussions } from '@services/communities/disc
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query/keys'
+import { formatRelative } from '@/lib/format'
 
 interface CourseCommunitySectionProps {
   courseUuid: string
@@ -86,7 +87,7 @@ export function CourseCommunitySection({ courseUuid, orgslug }: CourseCommunityS
           ) : (
             discussions.map((discussion) => {
               const discussionId = discussion.discussion_uuid.replace('discussion_', '')
-              const timeAgo = dayjs(discussion.creation_date).fromNow()
+              const timeAgo = formatRelative(discussion.creation_date)
               const authorName = discussion.author
                 ? `${discussion.author.first_name} ${discussion.author.last_name}`.trim() || discussion.author.username
                 : t('common.unknown')

@@ -5,10 +5,11 @@ import { useCoursePipe } from '../useAnalyticsDashboard'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ArrowsLeftRight } from '@phosphor-icons/react'
 import CourseWidgetCard, { WidgetIcon } from './CourseWidgetCard'
+import { formatDate } from '@/lib/format'
 
 function shortDate(v: string) {
   const d = new Date(v)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDate(d, undefined, { month: 'short', day: 'numeric' })
 }
 
 export default function CourseViewToEnrollment({
@@ -35,7 +36,7 @@ export default function CourseViewToEnrollment({
     enrollments: r.enrollments,
   }))
 
-  const MiniChart = () => (
+  const renderMiniChart = () => (
     <ResponsiveContainer width="100%" height={160}>
       <AreaChart data={chartRows}>
         <defs>
@@ -56,7 +57,7 @@ export default function CourseViewToEnrollment({
     </ResponsiveContainer>
   )
 
-  const ModalChart = () => (
+  const renderModalChart = () => (
     <ResponsiveContainer width="100%" height={380}>
       <AreaChart data={chartRows}>
         <defs>
@@ -106,7 +107,7 @@ export default function CourseViewToEnrollment({
                 <p className="text-2xl font-bold text-amber-600">{overallRate}%</p>
               </div>
             </div>
-            <ModalChart />
+            {renderModalChart()}
           </div>
         )
       }
@@ -127,7 +128,7 @@ export default function CourseViewToEnrollment({
               <span className="text-emerald-500 font-medium">{totalEnrollments} {t('analytics.course_analytics.units.enrolled')}</span>
             </div>
           </div>
-          <MiniChart />
+          {renderMiniChart()}
         </div>
       )}
     </CourseWidgetCard>

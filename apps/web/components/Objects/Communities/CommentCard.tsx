@@ -21,6 +21,7 @@ import {
 } from "@components/ui/dropdown-menu"
 import UserAvatar from '@components/Objects/UserAvatar'
 import { CommentUpvoteButton } from './CommentUpvoteButton'
+import { formatRelative } from '@/lib/format'
 
 dayjs.extend(relativeTime)
 
@@ -61,7 +62,7 @@ export function CommentCard({ comment, canManage = false, onDeleted, onUpdated }
   const isAuthor = currentUserId === comment.author_id
   const canDelete = isAuthor || canManage
   const showMenu = isAuthor || canManage
-  const timeAgo = dayjs(comment.creation_date).fromNow()
+  const timeAgo = formatRelative(comment.creation_date)
   const authorName = comment.author
     ? `${comment.author.first_name} ${comment.author.last_name}`.trim() || comment.author.username
     : t('common.unknown')

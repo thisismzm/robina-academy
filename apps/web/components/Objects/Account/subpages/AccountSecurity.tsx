@@ -30,6 +30,7 @@ import { RequestBodyWithAuthHeader, getResponseMetadata } from '@services/utils/
 import * as Yup from 'yup'
 import { useTranslation } from 'react-i18next'
 import AccountDangerZone from '@components/Objects/Account/subpages/AccountDangerZone'
+import { formatDate } from '@/lib/format'
 
 const validationSchema = Yup.object().shape({
   old_password: Yup.string().required('validation.required'),
@@ -822,7 +823,7 @@ function TwoFactorAuthSection() {
                 {status.confirmed_at
                   ? t('user.settings.security.mfa.enabled_since', {
                       defaultValue: 'Since {{date}}',
-                      date: new Date(status.confirmed_at).toLocaleDateString(undefined, {
+                      date: formatDate(new Date(status.confirmed_at), undefined, {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',

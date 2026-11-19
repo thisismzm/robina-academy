@@ -5,6 +5,7 @@ import { useCoursePipe } from '../useAnalyticsDashboard'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { ClockCountdown } from '@phosphor-icons/react'
 import CourseWidgetCard, { WidgetIcon } from './CourseWidgetCard'
+import { formatDate } from '@/lib/format'
 
 function formatSeconds(seconds: number): string {
   if (!seconds || seconds <= 0) return '0s'
@@ -17,7 +18,7 @@ function formatSeconds(seconds: number): string {
 
 function shortDate(v: string) {
   const d = new Date(v)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return formatDate(d, undefined, { month: 'short', day: 'numeric' })
 }
 
 export default function CourseAvgSessionDuration({
@@ -42,7 +43,7 @@ export default function CourseAvgSessionDuration({
 
   const empty = !isLoading && rows.length === 0
 
-  const MiniChart = () => (
+  const renderMiniChart = () => (
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={rows}>
         <XAxis dataKey="shortDate" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
@@ -55,7 +56,7 @@ export default function CourseAvgSessionDuration({
     </ResponsiveContainer>
   )
 
-  const ModalChart = () => (
+  const renderModalChart = () => (
     <ResponsiveContainer width="100%" height={380}>
       <BarChart data={rows}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -97,7 +98,7 @@ export default function CourseAvgSessionDuration({
                 <p className="text-2xl font-bold text-gray-700">{avgMinutes}m</p>
               </div>
             </div>
-            <ModalChart />
+            {renderModalChart()}
           </div>
         )
       }
@@ -115,7 +116,7 @@ export default function CourseAvgSessionDuration({
             </div>
             <span className="text-xs text-purple-400">{formatSeconds(totalSeconds)} {t('analytics.course_analytics.units.total')}</span>
           </div>
-          <MiniChart />
+          {renderMiniChart()}
         </div>
       )}
     </CourseWidgetCard>

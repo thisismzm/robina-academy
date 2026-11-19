@@ -27,6 +27,7 @@ import { useFormik } from 'formik'
 import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import { useAbsoluteUrl } from '@/lib/seo/useAbsoluteUrl'
+import { formatDate, formatRelative } from '@/lib/format'
 
 dayjs.extend(relativeTime)
 
@@ -356,10 +357,10 @@ const UpdatesListView = () => {
               <div className="flex items-baseline space-x-2">
                 <h4 className="text-sm font-medium text-neutral-800 truncate">{update.title}</h4>
                 <span
-                  title={dayjs(update.creation_date).format('MMMM D, YYYY')}
+                  title={formatDate(dayjs(update.creation_date), undefined, { dateStyle: 'long' })}
                   className="text-[11px] font-medium text-neutral-400 whitespace-nowrap"
                 >
-                  {dayjs(update.creation_date).fromNow()}
+                  {formatRelative(update.creation_date)}
                 </span>
               </div>
               <p className="text-sm text-neutral-600 line-clamp-3">{update.content}</p>

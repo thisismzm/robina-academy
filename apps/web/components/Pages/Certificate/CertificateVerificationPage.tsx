@@ -9,6 +9,7 @@ import { getUriWithOrg, getAbsoluteUriWithOrg } from '@services/config/config';
 import { getCourseThumbnailMediaDirectory } from '@services/media/media';
 import { useOrg } from '@components/Contexts/OrgContext';
 import { useTrackView, AnalyticsEvent } from '@services/analytics';
+import { formatDate } from '@/lib/format'
 
 interface CertificateVerificationPageProps {
   certificateUuid: string;
@@ -196,7 +197,7 @@ const CertificateVerificationPage: React.FC<CertificateVerificationPageProps> = 
                   certificatePattern={certificateData.certification.config.certificate_pattern}
                   certificateInstructor={certificateData.certification.config.certificate_instructor}
                   certificateId={certificateData.certificate_user.user_certification_uuid}
-                  awardedDate={new Date(certificateData.certificate_user.created_at).toLocaleDateString('en-US', {
+                  awardedDate={formatDate(new Date(certificateData.certificate_user.created_at), undefined, {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
@@ -317,7 +318,7 @@ const CertificateVerificationPage: React.FC<CertificateVerificationPageProps> = 
                   <label className="block text-sm font-medium text-gray-700 mb-1">Awarded Date</label>
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <span className="text-gray-900">
-                      {new Date(certificateData.certificate_user.created_at).toLocaleDateString('en-US', {
+                      {formatDate(new Date(certificateData.certificate_user.created_at), undefined, {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',

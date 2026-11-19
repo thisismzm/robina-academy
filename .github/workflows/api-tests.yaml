@@ -51,19 +51,3 @@ jobs:
         working-directory: apps/api
         env:
           TESTING: "true"
-
-      - name: Upload API coverage to Codecov
-        uses: codecov/codecov-action@v7.1.1
-        with:
-          files: apps/api/coverage.xml
-          flags: api
-          name: api-coverage
-          fail_ci_if_error: true
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v7.0.2
-        if: always()
-        with:
-          name: api-coverage-report
-          path: apps/api/htmlcov/
-          retention-days: 30

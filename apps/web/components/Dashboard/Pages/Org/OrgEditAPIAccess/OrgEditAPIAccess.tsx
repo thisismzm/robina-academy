@@ -56,6 +56,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs'
 import APIDocumentation from './APIDocumentation'
 import FeatureGate from '@components/Dashboard/Shared/FeatureGate/FeatureGate'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
+import { formatDate as formatLocalizedDate } from '@/lib/format'
 
 const OrgEditAPIAccess: React.FC = () => {
   const { t } = useTranslation()
@@ -189,7 +190,7 @@ const OrgEditAPIAccess: React.FC = () => {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Never'
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
+      return formatLocalizedDate(new Date(dateStr), undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

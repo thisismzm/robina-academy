@@ -40,6 +40,7 @@ import {
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import ConfirmationModal from '@components/Objects/StyledElements/ConfirmationModal/ConfirmationModal'
 import UserAvatar from '@components/Objects/UserAvatar'
+import { formatRelative } from '@/lib/format'
 
 /**
  * Get the proper avatar URL for a user
@@ -111,7 +112,7 @@ export function DiscussionCard({
   const discussionId = removeDiscussionPrefix(discussion.discussion_uuid)
   const communityId = communityUuid.replace('community_', '')
 
-  const timeAgo = dayjs(discussion.creation_date).fromNow()
+  const timeAgo = formatRelative(discussion.creation_date)
 
   const authorName = discussion.author
     ? `${discussion.author.first_name} ${discussion.author.last_name}`.trim() || discussion.author.username

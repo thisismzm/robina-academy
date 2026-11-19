@@ -16,6 +16,7 @@ import { getUriWithOrg } from '@services/config/config'
 import { UpvoteButton } from './UpvoteButton'
 import { ReactionButton } from './ReactionButton'
 import UserAvatar from '@components/Objects/UserAvatar'
+import { formatDate, formatRelative } from '@/lib/format'
 
 dayjs.extend(relativeTime)
 
@@ -40,8 +41,8 @@ export function DiscussionSidebar({
 }: DiscussionSidebarProps) {
   const { t } = useTranslation()
   const communityId = community.community_uuid.replace('community_', '')
-  const timeAgo = dayjs(discussion.creation_date).fromNow()
-  const createdDate = dayjs(discussion.creation_date).format('MMM D, YYYY')
+  const timeAgo = formatRelative(discussion.creation_date)
+  const createdDate = formatDate(dayjs(discussion.creation_date), undefined, { dateStyle: 'medium' })
   const labelInfo = getLabelInfo(discussion.label || 'general')
 
   const authorName = discussion.author

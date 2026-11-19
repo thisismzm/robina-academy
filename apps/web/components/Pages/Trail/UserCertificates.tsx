@@ -12,13 +12,14 @@ import { getAllUserCertificates } from '@services/courses/certifications'
 import { asArray } from '@services/utils/ts/requests'
 import { useTranslation } from 'react-i18next'
 import { getCourseThumbnailMediaDirectory } from '@services/media/media'
+import { formatDate } from '@/lib/format'
 
 interface UserCertificatesProps {
   orgslug: string
 }
 
 const UserCertificates: React.FC<UserCertificatesProps> = ({ orgslug }) => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const session = useLHSession() as any
   const access_token = session?.data?.tokens?.access_token
   const org = useOrg() as any
@@ -115,7 +116,7 @@ const UserCertificates: React.FC<UserCertificatesProps> = ({ orgslug }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {certificatesData.map((certificate: any) => {
           const verificationLink = getUriWithOrg(orgslug, `/certificates/${certificate.certificate_user.user_certification_uuid}/verify`)
-          const awardedDate = new Date(certificate.certificate_user.created_at).toLocaleDateString(i18n.language === 'fr' ? 'fr-FR' : 'en-US', {
+          const awardedDate = formatDate(new Date(certificate.certificate_user.created_at), undefined, {
             year: 'numeric',
             month: 'long',
             day: 'numeric'

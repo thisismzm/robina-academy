@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 type CodeStat = {
   invite_code_uuid: string
@@ -69,7 +70,7 @@ function CodeUsers({ orgId, codeUuid, token }: { orgId: number; codeUuid: string
             {[u.first_name, u.last_name].filter(Boolean).join(' ') || u.username}
             <span className="text-gray-400"> @{u.username}</span>
           </span>
-          <span className="text-gray-400">{dayjs(u.signed_up_at).format('DD/MM/YYYY HH:mm')}</span>
+          <span className="text-gray-400">{formatDateTime(dayjs(u.signed_up_at), undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</span>
         </li>
       ))}
     </ul>
@@ -134,9 +135,9 @@ function InviteCodeStats() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.timeseries}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={(d) => dayjs(d).format('DD MMM')} fontSize={11} />
+                  <XAxis dataKey="date" tickFormatter={(d) => formatDate(dayjs(d), undefined, { day: '2-digit', month: 'short' })} fontSize={11} />
                   <YAxis allowDecimals={false} fontSize={11} width={28} />
-                  <Tooltip labelFormatter={(d) => dayjs(d as string).format('DD/MM/YYYY')} />
+                  <Tooltip labelFormatter={(d) => formatDate(dayjs(d as string), undefined, { year: 'numeric', month: '2-digit', day: '2-digit' })} />
                   <Bar dataKey="total" name="Signups" fill="#16a34a" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -194,7 +195,7 @@ function InviteCodeStats() {
                         <td className="py-2.5 px-3 text-end font-semibold">{c.signups_in_period}</td>
                         <td className="py-2.5 px-3 text-end">{c.total_signups}</td>
                         <td className="py-2.5 px-3 text-gray-600">
-                          {c.last_used ? dayjs(c.last_used).format('DD/MM/YYYY') : '-'}
+                          {c.last_used ? formatDate(dayjs(c.last_used), undefined, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '-'}
                         </td>
                       </tr>
                       {open && (

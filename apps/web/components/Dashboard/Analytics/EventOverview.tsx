@@ -34,10 +34,11 @@ import {
   Cell,
 } from 'recharts'
 import { useTranslation } from 'react-i18next'
+import { formatDate } from '@/lib/format'
 
 const kFormatter = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v))
 const shortDate = (v: string) =>
-  new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  formatDate(new Date(v), undefined, { month: 'short', day: 'numeric' })
 
 const EVENT_META: Record<
   string,
@@ -141,9 +142,9 @@ export default function EventOverview({ days = '30' }: { days?: string }) {
   const totalDeviceVisits = devicePieData.reduce((s: number, d: any) => s + d.value, 0)
 
   // Custom tooltip for the DAU chart
-  const DauTooltipContent = ({ active, payload, label }: any) => {
+  const renderDauTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
-    const dateStr = new Date(label).toLocaleDateString('en-US', {
+    const dateStr = formatDate(new Date(label), undefined, {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -274,7 +275,7 @@ export default function EventOverview({ days = '30' }: { days?: string }) {
                   tickLine={false}
                   allowDecimals={false}
                 />
-                <Tooltip content={<DauTooltipContent />} />
+                <Tooltip content={renderDauTooltip} />
                 <Area
                   type="monotone"
                   dataKey="dau"
