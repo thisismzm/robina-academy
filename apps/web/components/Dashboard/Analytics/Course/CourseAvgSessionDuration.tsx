@@ -43,7 +43,7 @@ export default function CourseAvgSessionDuration({
 
   const empty = !isLoading && rows.length === 0
 
-  const MiniChart = () => (
+  const renderMiniChart = () => (
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={rows}>
         <XAxis dataKey="shortDate" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
@@ -56,7 +56,7 @@ export default function CourseAvgSessionDuration({
     </ResponsiveContainer>
   )
 
-  const ModalChart = () => (
+  const renderModalChart = () => (
     <ResponsiveContainer width="100%" height={380}>
       <BarChart data={rows}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -98,7 +98,7 @@ export default function CourseAvgSessionDuration({
                 <p className="text-2xl font-bold text-gray-700">{avgMinutes}m</p>
               </div>
             </div>
-            <ModalChart />
+            {renderModalChart()}
           </div>
         )
       }
@@ -116,7 +116,7 @@ export default function CourseAvgSessionDuration({
             </div>
             <span className="text-xs text-purple-400">{formatSeconds(totalSeconds)} {t('analytics.course_analytics.units.total')}</span>
           </div>
-          <MiniChart />
+          {renderMiniChart()}
         </div>
       )}
     </CourseWidgetCard>

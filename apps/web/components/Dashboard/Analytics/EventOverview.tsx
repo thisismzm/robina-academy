@@ -142,7 +142,7 @@ export default function EventOverview({ days = '30' }: { days?: string }) {
   const totalDeviceVisits = devicePieData.reduce((s: number, d: any) => s + d.value, 0)
 
   // Custom tooltip for the DAU chart
-  const DauTooltipContent = ({ active, payload, label }: any) => {
+  const renderDauTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
     const dateStr = formatDate(new Date(label), undefined, {
       month: 'long',
@@ -275,7 +275,7 @@ export default function EventOverview({ days = '30' }: { days?: string }) {
                   tickLine={false}
                   allowDecimals={false}
                 />
-                <Tooltip content={<DauTooltipContent />} />
+                <Tooltip content={renderDauTooltip} />
                 <Area
                   type="monotone"
                   dataKey="dau"
