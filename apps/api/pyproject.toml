@@ -49,6 +49,13 @@ dependencies = [
     "pgvector==0.5.1",
     "pypdf==6.21.2",
     "regex==2026.9.29",
+    "opentelemetry-sdk>=1.45.2",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.2",
+    "opentelemetry-instrumentation-fastapi>=0.66b2",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b2",
+    "opentelemetry-instrumentation-redis>=0.66b2",
+    "opentelemetry-instrumentation-httpx>=0.66b2",
+    "opentelemetry-instrumentation-requests>=0.66b2",
 ]
 
 [tool.ruff]

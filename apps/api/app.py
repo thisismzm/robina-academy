@@ -25,6 +25,7 @@ from src.core.ee_hooks import register_ee_middlewares
 from src.core.events.events import shutdown_app, startup_app
 from src.core.middleware.body_size import RequestBodySizeLimitMiddleware
 from src.core.middleware.cors import configure_cors
+from src.core.telemetry import setup_telemetry, shutdown_telemetry
 from src.security.csrf import CSRFProtectionMiddleware
 from src.router import v1_router
 from src.routers.content_files import router as content_files_router
@@ -149,6 +150,7 @@ async def lifespan(application: FastAPI):
         yield
     finally:
         await shutdown_app(application)()
+        shutdown_telemetry()
 
 
 app = FastAPI(
@@ -177,6 +179,15 @@ configure_cors(app)
 # JSON; 6 is gzip's own default.
 app.add_middleware(SelectiveGZipMiddleware, minimum_size=1000, compresslevel=6)
 register_ee_middlewares(app)
+
+# Added last so the tracing middleware is outermost and its server span covers
+# every other middleware (CORS, CSRF, body cap). No-op unless an OTLP endpoint
+# is configured.
+setup_telemetry(
+    app,
+    environment=learnhouse_config.general_config.env,
+    version=app.version,
+)
 
 # Content delivery: S3-aware router when S3 is enabled, local otherwise.
 # Both paths enforce access control; neither serves raw StaticFiles.
